@@ -40,7 +40,7 @@ def preprocess(args):
 
     if args.check:
         logger['log'].log(
-            f'[INFO {datetime.now()}]    validating target data'
+            f'[INFO {datetime.now()}]    validating datasets'
         )
 
         nlp = NLP(lark, operators)
@@ -114,7 +114,7 @@ def preprocess_datasets(nlp, vocab, datasets):
 
         now = datetime.now()
         logger['line'].update(
-            f'[INFO {now}]    {count:<6}/{data_len:>6} ' +
+            f'[INFO {now}]    {count:<6}/{data_len:>6} '
             f'preprocessing {dataset_name}'
         )
 
@@ -124,7 +124,7 @@ def preprocess_datasets(nlp, vocab, datasets):
             count += 1
 
             logger['line'].update(
-                f'[INFO {now}]    {count:<6}/{data_len:>6} ' +
+                f'[INFO {now}]    {count:<6}/{data_len:>6} '
                 f'preprocessing {dataset_name}'
             )
 
@@ -140,35 +140,57 @@ def preprocess_datasets(nlp, vocab, datasets):
 
 
 def validate_datasets(nlp, datasets):
+    """
+    Checks whether there is an equal number of
+    source and target samples in a dataset split.
+    Each target sample in each split is parsed to
+    verify the sample is syntactically correct.
+
+    :param nlp:         nl processing and parsing utils.
+    :param datasets:    all dataset splits with source and
+                        target samples.
+    """
 
     for dataset_name in datasets:
         dataset = datasets[dataset_name]
         logger['log'].log(
-            f'[INFO {datetime.now()}]    validating targets in '
+            f'[INFO {datetime.now()}]    validating dataset '
             f'\'{dataset_name}\''
         )
 
-        if 'tgt' in dataset:
-            targets = dataset['tgt']
-            success = True
+        sources = dataset['src']
+        targets = dataset['tgt']
+        success = True
 
-            for i in range(len(targets)):
+        # Check if equal number of source samples
+        # and target samples in dataset.
+        if len(sources) != len(targets):
+            success = False
+            logger['log'].log(
+                f'[WARN {datetime.now()}]    sample count mismatch, '
+                f'{len(sources)} source samples and {len(targets)} '
+                'target samples'
+            )
 
-                try:
-                    nlp.lark.parse(targets[i])
+        # Parse each target sample and verify
+        # it is a syntactically valid sample.
+        for i in range(len(targets)):
 
-                except Exception:
-                    success = False
-                    logger['log'].log(
-                        f'[WARN {datetime.now()}]    parsing error '
-                        f'while parsing line {i+1}'
-                    )
+            try:
+                nlp.lark.parse(targets[i])
 
-            if success:
+            except Exception:
+                success = False
                 logger['log'].log(
-                    f'[INFO {datetime.now()}]    \'{dataset_name}\' '
-                    f'target data OK'
+                    f'[WARN {datetime.now()}]    parsing error '
+                    f'while parsing line {i+1}'
                 )
+
+        if success:
+            logger['log'].log(
+                f'[INFO {datetime.now()}]    \'{dataset_name}\' '
+                f' data OK'
+            )
 
 
 def save_data(grammar, vocab, datasets):
@@ -350,7 +372,7 @@ if __name__ == '__main__':
                         help='Lark grammar for parsing target samples.')
 
     parser.add_argument('--start', type=str, default='start',
-                        help='The start rule of the grammar. Defaults to "start".')
+                        help='The start rule of the grammar.')
 
     parser.add_argument('--src_train', type=str, default=None,
                         help='Training dataset source samples.')
@@ -374,30 +396,15 @@ if __name__ == '__main__':
                         help='Path and name for saving preprocessed data.')
 
     parser.add_argument('--check', action='store_true', default=False,
-                        help='Check whether target examples are valid programs.')
+                        help='Check dataset and parse target samples.')
 
     args = parser.parse_args([
-        '--grammar',        'data/grammars/geoquery-sql-vars_kept.lark',
-        '--src_train',      'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-src_train.txt',
-        '--tgt_train',      'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-tgt_train.txt',
-        '--src_dev',        'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-src_dev.txt',
-        '--tgt_dev',        'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-tgt_dev.txt',
-        '--src_test',       'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-src_test.txt',
-        '--tgt_test',       'data/datasets/geoquery/geo_sql/question_split/vars_kept/geo_sql-a-tgt_test.txt',
-        '--save_data',      'compiled/geoquery_sql'
+        '--grammar', 'data/grammars/expression.lark',
+        '--src_train', 'data/datasets/expression/expr-src_train.txt',
+        '--tgt_train', 'data/datasets/expression/expr-tgt_train.txt',
+        '--save_data', 'compiled/expr',
+        '--check'
     ])
-
-    # args = parser.parse_args([
-    #     '--grammar',        'data/grammars/atis_sql.lark',
-    #     '--src_train',      'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-src_train.txt',
-    #     '--tgt_train',      'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-tgt_train.txt',
-    #     '--src_dev',        'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-src_dev.txt',
-    #     '--tgt_dev',        'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-tgt_dev.txt',
-    #     '--src_test',       'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-src_test.txt',
-    #     '--tgt_test',       'data/datasets/atis/atis_sql/question_split/vars_replaced/atis_sql-tgt_test.txt',
-    #     '--save_data',      'compiled/atis/atis_sql',
-    #     '--check'
-    # ])
 
     log = Logger()
     line = log.add_text('')
