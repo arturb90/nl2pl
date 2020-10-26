@@ -71,12 +71,22 @@ def preprocess(args):
         tgt_test=args.tgt_test,
     )
 
-    lark = Lark(
-        filtered,
-        keep_all_tokens=True,
-        parser='lalr',
-        start=args.start
-    )
+    try:
+
+        lark = Lark(
+            filtered,
+            keep_all_tokens=True,
+            parser='lalr',
+            start=args.start
+        )
+
+    except Exception as e:
+
+        logger['log'].log(
+            f'[ERR  {datetime.now()}]    ERROR: '
+            f'{e.args[0]}. (Wrong start rule argument?)'
+        )
+        return
 
     if args.check:
         logger['log'].log(
@@ -411,7 +421,7 @@ if __name__ == '__main__':
     parser.add_argument('--grammar', type=str, required=True,
                         help='Lark grammar for parsing target samples.')
 
-    parser.add_argument('--start', type=str, default='start',
+    parser.add_argument('--start', type=str, required=True,
                         help='The start rule of the grammar.')
 
     parser.add_argument('--src_train', type=str, default=None,
@@ -442,7 +452,8 @@ if __name__ == '__main__':
         '--grammar', 'data/grammars/expression.lark',
         '--src_train', 'data/datasets/expression/expr-src_train.txt',
         '--tgt_train', 'data/datasets/expression/expr-tgt_train.txt',
-        '--save_data', 'compiled/expr'
+        '--save_data', 'compiled/expr',
+        '--start', 'start'
     ])
 
     log = Logger()
