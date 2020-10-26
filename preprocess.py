@@ -58,7 +58,21 @@ def validate_args(args):
 
 
 def preprocess(args):
+    """
+    The main preprocessing function. Generates the
+    encoder and decoder vocabularies and dataset
+    objects. Stores the following files under the
+    path and name passed with the 'save_data' argument:
 
+    - <save_data>.<split>.pt
+    - <save_data>.lang.pt
+
+    These files serve as input to the 'train.py' script.
+
+    :param args:    Script arguments.
+    """
+
+    # Preprocess grammar and build terminal operators.
     grammar = io.grammar(args.grammar)
     filtered, operators = parse_grammar(grammar)
 
@@ -73,6 +87,7 @@ def preprocess(args):
 
     try:
 
+        # Generate the parser.
         lark = Lark(
             filtered,
             keep_all_tokens=True,
@@ -102,14 +117,25 @@ def preprocess(args):
         )
 
         nlp = NLP(lark, operators)
-        vocab, vocab_dicts = build_vocab(nlp, datasets)
+        vocab, vocab_dicts = __build_vocab(nlp, datasets)
         nlp.vocab = vocab
 
-        datasets = preprocess_datasets(nlp, vocab, datasets)
-        save_data(grammar, vocab_dicts, datasets)
+        datasets = __preprocess_datasets(nlp, vocab, datasets)
+        __save_data(grammar, vocab_dicts, datasets)
 
 
-def build_vocab(nlp, datasets):
+def __build_vocab(nlp, datasets):
+    """
+    Generates the encoder vocabulary (natural language tokens),
+    decoder vocabulary (programming language tokens) and stack
+    vocabulary (terminal and non-terminal symbols, tokens) by
+    parsing each source and target example in each split.
+
+    :param nlp:         nl processing and parsing utils.
+    :param datasets:    all dataset splits with source and
+                        target samples.
+    """
+
     inp_i2w, inp_w2i = __input_vocab(nlp, datasets)
     out_i2w, out_w2i = __output_vocab(nlp, datasets)
 
@@ -149,10 +175,23 @@ def build_vocab(nlp, datasets):
     return vocab, vocab_dicts
 
 
-def preprocess_datasets(nlp, vocab, datasets):
+def __preprocess_datasets(nlp, vocab, datasets):
+    """
+    Extracts a set of fields from each sample pair in each
+    dataset split (see 'build_fields').
+
+    :param nlp:         nl processing and parsing utils.
+    :param vocab:       encoder, decoder and stack vocabularies.
+    :param datasets:    all dataset splits with source and
+                        target samples.
+    :returns:           preprocessed datasets.
+    """
+
     result = {}
     dataset_count = 0
+
     for dataset_name in datasets:
+
         dataset_count += 1
         result[dataset_name] = []
         dataset = datasets[dataset_name]
@@ -169,6 +208,7 @@ def preprocess_datasets(nlp, vocab, datasets):
         )
 
         for sample in samples:
+
             fields = __build_fields(nlp, sample, vocab)
             result[dataset_name].append(fields)
             count += 1
@@ -243,7 +283,19 @@ def validate_datasets(nlp, datasets):
             )
 
 
-def save_data(grammar, vocab, datasets):
+def __save_data(grammar, vocab, datasets):
+    """
+    Saves the following files to under the path and name
+    specified as 'save_data' argument.
+
+    - <save_data>.<split>.pt
+    - <save_data>.lang.pt
+
+    :param grammar:     the raw grammar file.
+    :param vocab:       encoder, decoder and stack vocabularies.
+    :param datasets:    all dataset preprocessed dataset splits.
+    """
+
     lang = {
         'grammar': grammar,
         'start': args.start,
