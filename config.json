@@ -1,0 +1,18 @@
+{
+	"models": [
+		{
+			"id": 0,
+			"model": "compiled/geoquery-model.pt",
+			"opt": {
+				"beam_width": 1
+			}
+		},
+		{
+			"id": 1,
+			"model": "compiled/atis-model.pt",
+			"opt": {
+				"beam_width": 1
+			}
+		}
+	]
+}

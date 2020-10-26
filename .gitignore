@@ -1,0 +1,8 @@
+debug.py
+/venv-nl2pl/
+/data/
+
+/.vscode/
+/compiled/
+/__pycache__/
+*/__pycache__/
