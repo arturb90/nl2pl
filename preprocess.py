@@ -13,8 +13,48 @@ from util.nlp import NLP, Vocab, parse_grammar
 
 
 def validate_args(args):
-    # TODO: Validate args.
-    pass
+    """
+    Verifies preprocessing.py script arguments.
+
+    :param args:    Script arguments.
+    :returns:       'True' if arguments are valid,
+                    else 'False'.
+    """
+
+    valid = True
+
+    def validate_split_args(src_split, tgt_split):
+        # Verify both source and target data paths
+        # are set for this split.
+
+        if bool(src_split[1]) ^ bool(tgt_split[1]):
+            args_ids = ((tgt_split[0], src_split[0])
+                        if src_split[1] is None else
+                        (src_split[0], tgt_split[0]))
+
+            logger['log'].log(
+                f'[ERR  {datetime.now()}]    ERROR: Invalid arguments, '
+                f'\'{args_ids[0]}\' requires \'{args_ids[1]}\''
+            )
+
+            return False
+
+        else:
+            return True
+
+    src_train = ('src_train', args.src_train)
+    tgt_train = ('tgt_train', args.tgt_train)
+    valid = validate_split_args(src_train, tgt_train)
+
+    src_dev = ('src_dev', args.src_dev)
+    tgt_dev = ('tgt_dev', args.tgt_dev)
+    valid = validate_split_args(src_dev, tgt_dev)
+
+    src_test = ('src_test', args.src_test)
+    tgt_test = ('tgt_test', args.tgt_test)
+    valid = validate_split_args(src_test, tgt_test)
+
+    return valid
 
 
 def preprocess(args):
@@ -402,8 +442,7 @@ if __name__ == '__main__':
         '--grammar', 'data/grammars/expression.lark',
         '--src_train', 'data/datasets/expression/expr-src_train.txt',
         '--tgt_train', 'data/datasets/expression/expr-tgt_train.txt',
-        '--save_data', 'compiled/expr',
-        '--check'
+        '--save_data', 'compiled/expr'
     ])
 
     log = Logger()
@@ -415,5 +454,5 @@ if __name__ == '__main__':
         'line': line
     }
 
-    validate_args(args)
-    preprocess(args)
+    if validate_args(args):
+        preprocess(args)
