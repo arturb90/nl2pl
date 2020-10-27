@@ -321,8 +321,21 @@ def __save_data(grammar, vocab, datasets):
 
 
 def __input_vocab(nlp, datasets):
+    """
+    Extracts the set of natural language tokens from
+    each source sample in each dataset split and builds
+    the encoder vocabulary.
+
+    :param nlp:         nl processing and parsing utils.
+    :param datasets:    all dataset splits with source and
+                        target samples.
+    :returns:           'i2w' and 'w2i' dictionaries taking
+                        indices to tokens and vice versa.
+    """
+
     vocab = OrderedDict()
 
+    # Meta-Symbols.
     marks = nlp.mark.inp.values()
     marks = {m: None for m in marks}
     vocab.update(marks)
@@ -342,8 +355,21 @@ def __input_vocab(nlp, datasets):
 
 
 def __output_vocab(nlp, datasets):
+    """
+    Extracts the set of source code tokens from each target
+    sample in each dataset split and builds the decoder
+    vocabulary.
+
+    :param nlp:         nl processing and parsing utils.
+    :param datasets:    all dataset splits with source and
+                        target samples.
+    :returns:           'i2w' and 'w2i' dictionaries taking
+                        indices to tokens and vice versa.
+    """
+
     vocab = OrderedDict()
 
+    # Meta-Symbols.
     marks = nlp.mark.out.values()
     marks = {repr(m): None for m in marks}
     vocab.update(marks)
@@ -353,6 +379,7 @@ def __output_vocab(nlp, datasets):
         return repr(token)
 
     for terminal in nlp.TERMINALS.values():
+        # Add all recorded tokens for each terminal.
         tokens = terminal.tokens
         tokens = {repr(t): None for t in tokens}
         vocab.update(tokens)
@@ -361,6 +388,8 @@ def __output_vocab(nlp, datasets):
         tgt = datasets[dataset_name]['tgt']
 
         for sample in tgt:
+            # Parse each target sample and
+            # update vocabulary dict with tokens.
             tokens = nlp.tokenize(sample)
             tokens = {
                 (repr(t) if t.type not in nlp.OPERATOR
@@ -377,6 +406,16 @@ def __output_vocab(nlp, datasets):
 
 
 def __stack_vocab(nlp):
+    """
+    Collects the set of symbols that can occur on
+    the value stack of the parser. Builds the vocabulary
+    for the stack encoder.
+
+    :param nlp:         nl processing and parsing utils.
+    :returns:           'i2w' and 'w2i' dictionaries taking
+                        indices to tokens and vice versa.
+    """
+
     vocab = OrderedDict()
 
     marks = nlp.mark.out.values()
@@ -402,6 +441,16 @@ def __stack_vocab(nlp):
 
 
 def __build_fields(nlp, sample, vocab):
+    """
+    Preprocesses each sample in various ways and constructs
+    a number of fields used during training.
+
+    :param sample:      current source and target pair to be
+                        preprocessed.
+    :returns:           dictionary containg generated sample
+                        fields.
+    """
+
     src = sample[0]
     tgt = sample[1]
 
