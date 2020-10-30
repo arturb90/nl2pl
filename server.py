@@ -1,3 +1,11 @@
+'''
+This script lets you run multiple models specified
+in 'config.json' in the root directory as translation
+service.
+
+See 'config.json' for an example.
+'''
+
 import argparse
 import ast
 import json
@@ -21,15 +29,21 @@ def validate_data(data):
 
 @app.route('/', methods=['POST'])
 def serve():
+
+    # Default response.
     response = {
         'confidence': None,
         'parse': 'no response'
     }
 
     if request.method == 'POST':
+
+        # Unpack and parse client request data.
         data_bytes = request.data
         data_str = data_bytes.decode('UTF-8')
         data = ast.literal_eval(data_str)
+
+        # Evaluate data if valid.
         if validate_data(data):
             result = evaluate(data[0])
             response = {
@@ -41,10 +55,20 @@ def serve():
 
 
 def evaluate(data):
+    """
+    Evaluate data received from client. Data must
+    include a model id and an input source string.
+
+    :param data:    path to config file.
+    :returns:       evaluation result.
+    """
+
     src = data['src']
     model_id = data['id']
     model_env = models[model_id]['model_env']
     model_opt = models[model_id]['model_opt']
+
+    # Invoke the translate script.
     result = translate(model_env, model_opt, src)
     return result
 
@@ -55,6 +79,7 @@ def run(
     debug=False
 ):
 
+    # Start the flask app.
     app.run(
         host=host,
         port=port,
@@ -62,7 +87,14 @@ def run(
     )
 
 
-def load_models(args):
+def load_models(config_path):
+    """
+    Loads 'config.json' from path and then loads
+    models and corresponding model configurations.
+
+    :param config:  path to config file.
+    :returns:       loaded models.
+    """
 
     models = {}
     with open(args.config) as file:
@@ -72,6 +104,8 @@ def load_models(args):
         model_path = model_conf['model']
         model_env = load_model_env(model_path)
 
+        # Unique ID for each loaded model enables
+        # clients to address models individually.
         models[model_conf['id']] = {
             'model_env': model_env,
             'model_opt': model_conf['opt']
@@ -81,6 +115,7 @@ def load_models(args):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--config', type=str, default='config.json',
@@ -95,7 +130,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     validate_args(args)
 
-    models = load_models(args)
+    models = load_models(args.config)
 
     run(
         host=args.host,
