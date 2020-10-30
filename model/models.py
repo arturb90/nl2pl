@@ -308,11 +308,19 @@ class Seq2Seq(nn.Module):
 
         return output
 
-    def evaluate(self, nlp, src_i, src_w, num_parsers=1, beam_width=1):
+    def evaluate(
+        self, nlp,
+        src_i, src_w,
+        num_parsers=1,
+        beam_width=1,
+        max_cycles=0
+    ):
+
         parser = StochasticLALR(
             nlp, self.decoder,
             num_parsers=num_parsers,
-            beam_width=beam_width
+            beam_width=beam_width,
+            max_cycles=max_cycles
         )
 
         with torch.no_grad():

@@ -1,4 +1,5 @@
 import heapq
+import numpy as np
 import torch
 
 from abc import ABC, abstractmethod
@@ -171,8 +172,9 @@ class StochasticLALR(LALRBase):
     def __init__(
         self, nlp,
         decoder,
-        num_parsers=3,
-        beam_width=3
+        num_parsers=1,
+        beam_width=1,
+        max_cycles=0
     ):
 
         super(StochasticLALR, self).__init__(nlp)
@@ -180,6 +182,7 @@ class StochasticLALR(LALRBase):
         self.decoder = decoder
         self.num_parsers = num_parsers
         self.beam_width = beam_width
+        self.max_cycles = max_cycles
 
         self.__cache = {
             'state_stack': self.state_stack[:],
@@ -208,6 +211,24 @@ class StochasticLALR(LALRBase):
 
                 else:
                     updated.append(parsepath)
+
+            # Search for cycles in paths and
+            # and discard paths beginning the
+            # 'max_cycle'-th cycle.
+            for i in range(len(updated)):
+
+                if self.__cycle_detection(
+                    self.max_cycles,
+                    updated[i]
+                ):
+
+                    # Mark for removal.
+                    updated[i] = None
+
+            updated = list(filter(
+                (lambda x: x is not None),
+                updated
+            ))
 
             del parsepaths[:]
             updated = self.__topn_paths(
@@ -292,20 +313,10 @@ class StochasticLALR(LALRBase):
                 token = symbol
 
                 # Resolve operator symbol if copy attention is used.
-                # TODO: Enforce usage of copy attention.
                 memory_bank = parsepath['memory_bank']
                 if memory_bank['copy_attention'] \
                         and symbol.type in self.nlp.OPERATOR:
-                    operator = self.nlp.OPERATOR[symbol.type]
-                    copy_weights = memory_bank['copy_weights']
-                    enc_inp = memory_bank['enc_inp']
-                    _, indices = torch.topk(copy_weights, len(enc_inp))
-                    indices = indices.squeeze()
-                    copy_w = enc_inp[indices[0]]
-                    while not operator.target.match(copy_w):
-                        indices = indices[1:]
-                        copy_w = enc_inp[indices[0]]
-                    token = Token(symbol.type, copy_w)
+                    token = self.__resolve_operator(symbol, memory_bank)
 
                 try:
                     subparser.parse(token)
@@ -330,6 +341,51 @@ class StochasticLALR(LALRBase):
                     next_.pop(i)
 
         return updated
+
+    def __resolve_operator(self, symbol, memory_bank):
+
+        operator = self.nlp.OPERATOR[symbol.type]
+        copy_weights = memory_bank['copy_weights']
+        inp = memory_bank['enc_inp'][1:-1]
+        copy_weights = copy_weights[:, 1:-1]
+        _, idx = torch.topk(copy_weights, len(inp))
+        idx = idx.squeeze()
+        copy_w = inp[idx[0]]
+
+        while not operator.target.match(copy_w):
+            # If selected word does not match the regex
+            # defined by the operator, try the noxt most
+            # likely copy token.
+
+            if idx:
+                idx = idx[1:]
+                copy_w = inp[idx[0]]
+
+            else:
+                # Fallback if no viable token found.
+                copy_w = f'<{operator.type}>'
+
+        token = Token(symbol.type, copy_w)
+        return token
+
+    def __cycle_detection(self, max_cycles, parsepath):
+        seq = np.array(parsepath['parser'].predictions[:])
+        seq_shifted = seq[:]
+
+        start_i = 2 * max_cycles
+        for i in range(start_i, len(seq)):
+            matched = np.abs(seq[i:] - seq_shifted[:-i])
+
+            if len(matched) > (i * max_cycles):
+
+                slice_ = matched[-(i * max_cycles):]
+                if not np.sum(slice_):
+                    return True
+
+            else:
+                break
+
+        return False
 
     def __topn_paths(self, n, parsepaths):
 

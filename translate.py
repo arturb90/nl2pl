@@ -189,11 +189,12 @@ def evaluate(args, env, dataset, logger):
 
         else:
             # Evaluate model with parser assistance.
+            src_norm = nlp.normalize(example['src'], True)
             src_i = torch.LongTensor(example['src_i'])
             src_i.to(model.device)
 
             top = model.evaluate(
-                nlp, src_i.to(model.device), example['src'],
+                nlp, src_i.to(model.device), src_norm,
                 num_parsers=args.beam_width,
                 beam_width=args.beam_width,
                 max_cycles=2
@@ -267,14 +268,14 @@ if __name__ == '__main__':
                         help='Turns off parser-assisted decoding.')
 
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_115.pt',
-        '--eval',           'compiled/geoquery_sql.test.pt',
+        '--model',          'compiled/geoquery-model.model_step_180.pt',
+        '--eval',           'compiled/geoquery.test.pt',
         '--out',            'compiled/log_eval.txt',
         '--beam_width',     '1'
     ])
 
     # args = parser.parse_args([
-    #     '--model',          '../nl2pl-demo/model/geoquery_demo.model.pt',
+    #     '--model',          'compiled/geoquery-model.model_step_180.pt',
     #     '--beam_width',     '1'
     # ])
 

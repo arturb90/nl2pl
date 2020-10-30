@@ -30,16 +30,16 @@ def collate_fn(batch):
         stack = stacks[i]
         stack_pad[i, :stack.size(0), :stack.size(1)] = stack
 
-    # Padding value is 1, for stacks that only contain 
+    # Padding value is 1, for stacks that only contain
     # start-of-sequence token. Ignored during forward pass
     # since it corresponds to decoder padding targets.
     stack_lens = pad_sequence(stack_lens, padding_value=1)
     stack_lens = stack_lens.tolist()
 
-    return (source_pad, 
-            target_pad, 
-            src_lens, 
-            tgt_lens, 
+    return (source_pad,
+            target_pad,
+            src_lens,
+            tgt_lens,
             align_pad,
             stack_pad,
             stack_lens)
