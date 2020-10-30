@@ -217,7 +217,7 @@ class StochasticLALR(LALRBase):
             # 'max_cycle'-th cycle.
             for i in range(len(updated)):
 
-                if self.__cycle_detection(
+                if self.max_cycles and self.__cycle_detection(
                     self.max_cycles,
                     updated[i]
                 ):
@@ -348,24 +348,41 @@ class StochasticLALR(LALRBase):
         copy_weights = memory_bank['copy_weights']
         inp = memory_bank['enc_inp'][1:-1]
         copy_weights = copy_weights[:, 1:-1]
-        _, idx = torch.topk(copy_weights, len(inp))
-        idx = idx.squeeze()
-        copy_w = inp[idx[0]]
 
-        while not operator.target.match(copy_w):
+        shape = (1, copy_weights.shape[1])
+        val_buffer = torch.empty(shape)
+        idx_buffer = torch.empty(
+            shape,
+            dtype=torch.long
+        )
+
+        torch.topk(
+            copy_weights, len(inp),
+            out=(val_buffer, idx_buffer)
+        )
+
+        idx_buffer = idx_buffer[0].tolist()
+        copy_t = f'<{operator.type}>'
+
+        if idx_buffer:
+            copy_t = inp[idx_buffer[0]]
+            idx_buffer = idx_buffer[1:]
+
+        while not operator.target.match(copy_t):
             # If selected word does not match the regex
             # defined by the operator, try the noxt most
             # likely copy token.
 
-            if idx:
-                idx = idx[1:]
-                copy_w = inp[idx[0]]
+            if idx_buffer:
+                copy_t = inp[idx_buffer[0]]
+                idx_buffer = idx_buffer[1:]
 
             else:
                 # Fallback if no viable token found.
-                copy_w = f'<{operator.type}>'
+                copy_t = f'<{operator.type}>'
+                break
 
-        token = Token(symbol.type, copy_w)
+        token = Token(symbol.type, copy_t)
         return token
 
     def __cycle_detection(self, max_cycles, parsepath):
