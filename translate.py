@@ -23,6 +23,14 @@ def validate_args(args):
 
 
 def load_model_env(model_path):
+    """
+    Loads a .pt model file.
+
+    :param model_path:  path to model file.
+    :returns:           model environment including
+                        neural network, parser and utilites.
+    """
+
     model_data = torch.load(
         model_path,
         map_location=device
@@ -36,6 +44,7 @@ def load_model_env(model_path):
         'stack': Vocab(lang['vocab']['stack'])
     }
 
+    # Load model environment (Neural Net, Parser, Utilities).
     grammar, operators = parse_grammar(lang['grammar'])
 
     lark = Lark(
@@ -49,6 +58,7 @@ def load_model_env(model_path):
     nlp.collect_tokens(vocab)
     nlp.vocab = vocab
 
+    # Load model from settings and set to eval mode.
     settings = model_settings(vocab, model_opt)
     model = build_model(vocab, settings)
     model.load_state_dict(model_data['state_dict'])
@@ -65,14 +75,26 @@ def load_model_env(model_path):
 
 
 def translate(model_env, model_opt, src):
+    """
+    Translate a single natural language input string.
+
+    :param model_env:   the model environment to execute the
+                        source input string against.
+    :params model_opt:  model and parser options.
+    :params src:        source input string to translate.
+    :returns:           model response program code.
+    """
+
     model = model_env['model']
     vocab = model_env['vocab']
     nlp = model_env['nlp']
 
     src_i = []
+    # Preprocess source input string.
     tokens = nlp.normalize(src, delimiters=True)
     unk_token = nlp.mark.inp['UNK']
     unk_index = vocab['src'].w2i(unk_token)
+    # Get translation specific options.
     opts = get_opts(model_opt)
 
     for t in tokens:
@@ -84,6 +106,7 @@ def translate(model_env, model_opt, src):
         except KeyError:
             src_i.append(unk_index)
 
+    # Evaluate input.
     results = model.evaluate(
         nlp, torch.LongTensor(src_i).to(model.device),
         tokens, num_parsers=opts['beam_width'],
@@ -172,7 +195,8 @@ def evaluate(args, env, dataset, logger):
             top = model.evaluate(
                 nlp, src_i.to(model.device), example['src'],
                 num_parsers=args.beam_width,
-                beam_width=args.beam_width
+                beam_width=args.beam_width,
+                max_cycles=2
             )
 
             predictions = top['parser'].predictions
@@ -243,11 +267,10 @@ if __name__ == '__main__':
                         help='Turns off parser-assisted decoding.')
 
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_403.pt',
+        '--model',          'compiled/geoquery-model.model_step_115.pt',
         '--eval',           'compiled/geoquery_sql.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '1',
-        '--no_parser'
+        '--beam_width',     '1'
     ])
 
     # args = parser.parse_args([
