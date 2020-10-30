@@ -16,6 +16,8 @@ from util.nlp import Vocab
 from util.data import Dataset, collate_fn
 from util.log import Logger
 
+# For padded copy weights to ensure
+# numerical stability.
 _EPSILON = 1e-6
 
 
@@ -25,6 +27,18 @@ def validate_args(args):
 
 
 def __save_model(model, model_opts, lang, epoch, best_epoch):
+    """
+    Saves the model with the complete data regenerate the
+    environment (parser, utilites.). Yields a .pt file.
+
+    :param model_opts:  model configuration data.
+    :param lang:        language data such as vocabularies and
+                        grammar for parser generation.
+    :param epoch:       current training epoch.
+    :param best_epoch:  training epoch of the last model saved
+                        for removal.
+    """
+
     model_path = f'{args.save}.model_step_{epoch}.pt'
     previous_best = f'{args.save}.model_step_{best_epoch}.pt'
 
@@ -41,6 +55,17 @@ def __save_model(model, model_opts, lang, epoch, best_epoch):
 
 
 def validate(model, dataset, crit):
+    """
+    Validates the latest model on dataset.
+
+    :param model:       the model after parameter update.
+    :param dataset:     the validation dataset.
+    :param epoch:       NLL loss criterion.
+    :returns:           validation statistics.
+    """
+
+    # Set evaluation mode to turn
+    # dropout off.
     model.eval()
 
     dataloader = DataLoader(
@@ -53,6 +78,7 @@ def validate(model, dataset, crit):
     dataiter = iter(dataloader)
     results = []
 
+    # No gradient computation during validation.
     with torch.no_grad():
 
         for batch in dataiter:
@@ -60,9 +86,12 @@ def validate(model, dataset, crit):
                 align_pad, stack_pad, stack_lens = batch
 
             if model.decoder.stack_encoder:
+                # When stack encodings are used,
+                # teacher forcing required.
                 tf = 1.0
 
             else:
+                # No teacher forcing during validation.
                 tf = 0.0
 
             tgt_len = tgt_pad.size(0)
@@ -88,11 +117,17 @@ def validate(model, dataset, crit):
                 copy_weights = output['copy_weights']
                 copy_weights = copy_weights[1:].transpose(0, 1)
                 copy_pred = copy_weights.reshape(-1, src_len)
+                # Copy weights are padded and masked, setting
+                # padding positions to a very low value ensures
+                # numerical stability.
                 copy_pred[copy_pred == 0] = _EPSILON
+                # Copy weights are softmaxed. But NLL loss
+                # expects log-likelihoods.
                 copy_pred = torch.log(copy_pred)
                 align_pad = align_pad[1:].transpose(0, 1)
                 copy_tgts = align_pad.reshape(-1)
                 copy_loss = crit(copy_pred, copy_tgts)
+                # Add copy loss to batch loss.
                 batch_loss += copy_loss
 
             batch_results = {
@@ -110,6 +145,8 @@ def validate(model, dataset, crit):
                     'copy_targets': copy_tgts
                 })
 
+            # Cache batch results for computing
+            # statistics later.
             results.append(batch_results)
             dev_loss += batch_loss.item()
 
@@ -123,6 +160,17 @@ def validate(model, dataset, crit):
 
 
 def train_epoch(model, dataset, opt, crit, epoch_n):
+    """
+    Training for one epoch.
+
+    :param dataset:     training dataset
+    :param opt:         SGD optimizer.
+    :param crit:        NLL loss criterion.
+    :param epoch_n:     epoch number.
+    :returns:           training statistics.
+    """
+
+    # Set to training mode.
     model.train()
 
     dataloader = DataLoader(
@@ -174,14 +222,23 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
             copy_weights = output['copy_weights']
             copy_weights = copy_weights[1:].transpose(0, 1)
             copy_pred = copy_weights.reshape(-1, src_len)
+            # Copy weights are padded and masked, setting
+            # padding positions to a very low value ensures
+            # numerical stability.
             copy_pred[copy_pred == 0] = _EPSILON
+            # Copy weights are softmaxed. But NLL loss
+            # expects log-likelihoods.
             copy_pred = torch.log(copy_pred)
             align_pad = align_pad[1:].transpose(0, 1)
             copy_tgts = align_pad.reshape(-1)
             copy_loss = crit(copy_pred, copy_tgts)
+            # Add copy loss to batch loss.
             batch_loss += copy_loss
 
         batch_loss.backward()
+
+        # Gradient clip to avoid
+        # exploding gradients.
         nn.utils.clip_grad_norm_(
             model.parameters(),
             args.gradient_clip
@@ -233,8 +290,18 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
 
 
 def train(model, lang, datasets):
+    """
+    Trains a semantic parser that translates natural
+    language expressions to program code based on the
+    language data provided.
+
+    :param model:       model to be trained.
+    :param lang:        language data for the model to be
+                        trained.
+    :param datasets:    training and validation datasets.
+    """
+
     # Zero is padding token and no alignment.
-    # crit = nn.CrossEntropyLoss(ignore_index=0, reduction='sum')
     crit = nn.NLLLoss(ignore_index=0, reduction='sum')
     opt = optim.SGD(
         model.parameters(),
@@ -292,6 +359,7 @@ def train(model, lang, datasets):
         )
 
         if 'dev' in datasets and args.validate:
+            # Validate model.
             statistics = validate(model, dev_set, crit)
 
             dev_loss = statistics.loss
@@ -318,6 +386,8 @@ def train(model, lang, datasets):
                 f'{"best dev accuracy: ":<25}{best_dev_acc*100:0>6.3f}%'
             )
 
+            # Save model if new best exact match accuracy on
+            # development set.
             if args.best_gold and gold_acc > best_dev_acc:
                 best_dev_acc = gold_acc
                 __save_model(model, args, lang, epoch, best_epoch)
@@ -329,6 +399,7 @@ def train(model, lang, datasets):
                     f'new best dev split gold accuracy, saving model'
                 )
 
+            # Save model if new best accuracy on development set.
             elif not args.best_gold and accuracy > best_dev_acc:
                 best_dev_acc = accuracy
                 __save_model(model, args, lang, epoch, best_epoch)
@@ -358,6 +429,8 @@ def train(model, lang, datasets):
     )
 
     logger['log'].close()
+
+    # Save model each epoch if not validating.
     if 'dev' not in datasets or not args.validate:
         __save_model(model, args, lang, epoch, epoch)
 
@@ -376,14 +449,16 @@ if __name__ == '__main__':
                         help='The file in which training info is logged.')
 
     parser.add_argument('--validate', action='store_true', default=False,
-                        help='Whether to validate training progress on the dev split')
+                        help='Whether to validate training progress on the'
+                        ' dev split')
 
     parser.add_argument('--early_stop', type=int, default=100,
-                        help='Stop training when validation accuracy has not improved'
-                        ' since the specified number of iterations.')
+                        help='Stop training when validation accuracy has not'
+                        ' improved since the specified number of iterations.')
 
     parser.add_argument('--best_gold', action='store_true', default=False,
-                        help='Save model with best development gold accuracy when validating.')
+                        help='Save model with best development gold accuracy'
+                        ' when validating.')
 
     # Global training hyperparameters.
     parser.add_argument('--epochs', type=int, default=500,
@@ -403,14 +478,16 @@ if __name__ == '__main__':
                         help='Attention mechanism according to Bahdanau.')
 
     parser.add_argument('--copy', action='store_true', default=False,
-                        help='Copy attention for copying tokens from the input sentence.')
+                        help='Copy attention for copying tokens from the'
+                        ' input sentence.')
 
     # Parameters for value stack encoder.
     parser.add_argument('--stack_encoding', action='store_true', default=False,
                         help='Value stack encodings used during decoding.')
 
     parser.add_argument('--stack_emb_size', type=int, default=16,
-                        help='Dimension of embedding vector for stack encoder.')
+                        help='Dimension of embedding vector for stack'
+                        ' encoder.')
 
     parser.add_argument('--stack_hidden_size', type=int, default=16,
                         help='Dimension of stack encoder hidden state.')
@@ -438,20 +515,23 @@ if __name__ == '__main__':
                         help='Dropout applied to encoder embeddings.')
 
     parser.add_argument('--enc_rnn_dropout', type=float, default=0.05,
-                        help='Dropout applied to encoder outputs and hidden states')
+                        help='Dropout applied to encoder outputs and'
+                        ' hidden states')
 
     parser.add_argument('--dec_emb_dropout', type=float, default=0.1,
                         help='Dropout applied to decoder embeddings.')
 
     parser.add_argument('--dec_rnn_dropout', type=float, default=0.05,
-                        help='Dropout applied to decoder outputs and hidden states')
+                        help='Dropout applied to decoder outputs and'
+                        ' hidden states')
 
     parser.add_argument('--teacher_forcing', type=float, default=1.0,
-                        help='Ratio of decoder`s own predictions and true target '
-                        'values used during training.')
+                        help='Ratio of decoder`s own predictions and true'
+                        ' target values used during training.')
 
     parser.add_argument('--bidirectional', action='store_true', default=False,
-                        help='Set encoder to compute forward and backward hidden states.')
+                        help='Set encoder to compute forward and backward'
+                        ' hidden states.')
 
     # Args set for debugging purposes.
     args = parser.parse_args([
