@@ -129,6 +129,17 @@ def get_opts(model_opt):
 
 
 def evaluate(args, env, dataset, logger):
+    """
+    Evaluates the model in 'env' on 'dataset'.
+
+    :param env:     the model environment to evaluate
+                    the dataset against.
+    :param dataset: the dataset to be evaluated.
+    :param logger:  logging information on console or
+                    to file.
+    :returns:       scorer results.
+    """
+
     model = env['model']
     vocab = env['vocab']
     nlp = env['nlp']
@@ -152,6 +163,7 @@ def evaluate(args, env, dataset, logger):
         # to evaluate against the extended vocabulary
         # which is the union of encoder and decoder
         # vocabulary.
+
         vocab = vocab['tgt'].extend(vocab['src'])
 
     scorer = Scorer(nlp, vocab)
@@ -162,6 +174,7 @@ def evaluate(args, env, dataset, logger):
             # Evaluate model without parser assistance.
             # TODO: Gives wrong results when stack
             # encodings were used.
+
             alignment = example['alignment']
             tgt_i = torch.LongTensor(example['tgt_i'])
             src_i = torch.LongTensor(example['src_i'])
@@ -193,6 +206,7 @@ def evaluate(args, env, dataset, logger):
             # copy token from input sequence.
 
         else:
+
             # Evaluate model with parser assistance.
             src_norm = nlp.normalize(example['src'], True)
             src_i = torch.LongTensor(example['src_i'])
@@ -232,6 +246,7 @@ def evaluate(args, env, dataset, logger):
 
 
 def main(args, logger):
+
     env = load_model_env(args.model)
 
     if args.eval:
@@ -256,11 +271,13 @@ def main(args, logger):
         logger['log'].close()
 
     else:
+
         # TODO: Run translation server.
         pass
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--model', type=str, required=True,
@@ -273,8 +290,8 @@ if __name__ == '__main__':
                         help='The logging file.')
 
     parser.add_argument('--beam_width', type=int, default=1,
-                        help='The beam with for the parser decoder. Defaults \
-                            to greedy search.')
+                        help='The beam with for the parser decoder. Defaults'
+                        'to greedy search.')
 
     parser.add_argument('--no_parser', action='store_true',
                         help='Turns off parser-assisted decoding.')
