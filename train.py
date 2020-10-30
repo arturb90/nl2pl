@@ -16,6 +16,8 @@ from util.nlp import Vocab
 from util.data import Dataset, collate_fn
 from util.log import Logger
 
+_EPSILON = 1e-6
+
 
 def validate_args(args):
     # TODO: Validate args.
@@ -86,6 +88,8 @@ def validate(model, dataset, crit):
                 copy_weights = output['copy_weights']
                 copy_weights = copy_weights[1:].transpose(0, 1)
                 copy_pred = copy_weights.reshape(-1, src_len)
+                copy_pred[copy_pred == 0] = _EPSILON
+                copy_pred = torch.log(copy_pred)
                 align_pad = align_pad[1:].transpose(0, 1)
                 copy_tgts = align_pad.reshape(-1)
                 copy_loss = crit(copy_pred, copy_tgts)
@@ -170,6 +174,8 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
             copy_weights = output['copy_weights']
             copy_weights = copy_weights[1:].transpose(0, 1)
             copy_pred = copy_weights.reshape(-1, src_len)
+            copy_pred[copy_pred == 0] = _EPSILON
+            copy_pred = torch.log(copy_pred)
             align_pad = align_pad[1:].transpose(0, 1)
             copy_tgts = align_pad.reshape(-1)
             copy_loss = crit(copy_pred, copy_tgts)
@@ -201,6 +207,9 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
         results.append(batch_results)
         epoch_loss += batch_loss.item()
 
+        if epoch_loss < 0:
+            print('pause')
+
         count += 1
         logger['line'].update(
             f'[INFO {now}]    EPOCH {epoch_n} >   '
@@ -225,6 +234,7 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
 
 def train(model, lang, datasets):
     # Zero is padding token and no alignment.
+    # crit = nn.CrossEntropyLoss(ignore_index=0, reduction='sum')
     crit = nn.NLLLoss(ignore_index=0, reduction='sum')
     opt = optim.SGD(
         model.parameters(),
@@ -379,7 +389,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=500,
                         help='Number of training iterations.')
 
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=16,
                         help='Number of samples to batch.')
 
     parser.add_argument('--learning_rate', type=float, default=0.1,
@@ -418,10 +428,10 @@ if __name__ == '__main__':
     parser.add_argument('--dec_emb_size', type=int, default=64,
                         help='Dimension of embedding vector for decoder.')
 
-    parser.add_argument('--enc_hidden_size', type=int, default=128,
+    parser.add_argument('--enc_hidden_size', type=int, default=92,
                         help='Dimension of encoder hidden state.')
 
-    parser.add_argument('--dec_hidden_size', type=int, default=128,
+    parser.add_argument('--dec_hidden_size', type=int, default=92,
                         help='Dimension of decoder hidden state.')
 
     parser.add_argument('--enc_emb_dropout', type=float, default=0.1,
@@ -445,26 +455,26 @@ if __name__ == '__main__':
 
     # Args set for debugging purposes.
     args = parser.parse_args([
-        '--data',               'compiled/geoquery_sql',
+        '--data',               'compiled/geoquery',
         '--save',               'compiled/geoquery-model',
         '--out',                'compiled/log_train.txt',
         '--epochs',             '1000',
         '--early_stop',         '200',
         '--layers',             '1',
-        '--enc_hidden_size',    '64',
-        '--dec_hidden_size',    '64',
-        '--enc_emb_size',       '32',
-        '--dec_emb_size',       '32',
-        '--batch_size',         '32',
-        '--teacher_forcing',    '0.8',
-        '--enc_rnn_dropout',    '0.1',
-        '--dec_rnn_dropout',    '0.1',
-        '--enc_emb_dropout',    '0.05',
-        '--dec_emb_dropout',    '0.05',
+        '--enc_hidden_size',    '96',
+        '--dec_hidden_size',    '96',
+        '--enc_emb_size',       '64',
+        '--dec_emb_size',       '64',
+        '--batch_size',         '8',
+        '--teacher_forcing',    '1.0',
+        '--enc_rnn_dropout',    '0.0',
+        '--dec_rnn_dropout',    '0.0',
+        '--enc_emb_dropout',    '0.0',
+        '--dec_emb_dropout',    '0.0',
         '--attention',
-        '--stack_encoding',
-        '--bidirectional',
         '--validate',
+        '--bidirectional',
+        '--copy',
         '--best_gold'
     ])
 
