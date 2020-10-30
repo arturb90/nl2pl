@@ -13,6 +13,8 @@ class Scorer:
         self.__correct_examples = 0
         self.__correct_tokens = 0
 
+        self.__aborted_parses = 0
+
     def score(self, results, tgt_seq):
         pred_seq = results['predictions']
         tgt_len = len(tgt_seq)
@@ -41,11 +43,13 @@ class Scorer:
         self.__total_examples += 1
         self.__correct_tokens += sum(equal)
         self.__correct_examples += all(i is True for i in equal)
+        self.__aborted_parses += results['aborted']
 
     def results(self):
         return {
             'accuracy': self.__correct_tokens / self.__total_tokens,
-            'gold_acc': self.__correct_examples / self.__total_examples
+            'gold_acc': self.__correct_examples / self.__total_examples,
+            'aborted': self.__aborted_parses
         }
 
 

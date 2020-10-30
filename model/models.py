@@ -383,5 +383,4 @@ class Seq2Seq(nn.Module):
 
             top, candidates = parser.parse(memory_bank)
 
-        # return top, candidates
-        return top
+        return top, candidates

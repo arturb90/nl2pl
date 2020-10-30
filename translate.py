@@ -80,8 +80,8 @@ def translate(model_env, model_opt, src):
 
     :param model_env:   the model environment to execute the
                         source input string against.
-    :params model_opt:  model and parser options.
-    :params src:        source input string to translate.
+    :param model_opt:   model and parser options.
+    :param src:         source input string to translate.
     :returns:           model response program code.
     """
 
@@ -107,13 +107,13 @@ def translate(model_env, model_opt, src):
             src_i.append(unk_index)
 
     # Evaluate input.
-    results = model.evaluate(
+    top, candidates = model.evaluate(
         nlp, torch.LongTensor(src_i).to(model.device),
         tokens, num_parsers=opts['beam_width'],
         beam_width=opts['beam_width']
     )
 
-    return results
+    return top
 
 
 def get_opts(model_opt):
@@ -147,6 +147,13 @@ def evaluate(args, env, dataset, logger):
         f'examples evaluated'
     )
 
+    if model.copy_attention:
+        # If we use copy attention we have
+        # to evaluate against the extended vocabulary
+        # which is the union of encoder and decoder
+        # vocabulary.
+        vocab = vocab['tgt'].extend(vocab['src'])
+
     scorer = Scorer(nlp, vocab)
     for example in dataset:
         tgt = example['tgt_i'][1:]
@@ -168,11 +175,6 @@ def evaluate(args, env, dataset, logger):
             stack_lens = pad_sequence((stack_lens,), padding_value=1)
             stack_lens = stack_lens.tolist()
 
-            # stacks = example['value_stacks']
-            # stack_lens = [[len(vs)] for vs in stacks]
-            # stacks = torch.LongTensor(stacks).to(model.device)
-            # stacks = stacks.unsqueeze(0)
-
             with torch.no_grad():
                 output = model(
                     src_i, tgt_i,
@@ -182,10 +184,13 @@ def evaluate(args, env, dataset, logger):
                 )
 
             dec_outs = output['dec_outs']
-            vocab_size = model.decoder.vocab_size
             dec_outs = dec_outs[1:, :, :]
             dec_outs = dec_outs.squeeze()
             predictions = dec_outs.argmax(1)
+            # No parse to abort.
+            aborted = False
+            # TODO: Replace pointer tokens with resultant
+            # copy token from input sequence.
 
         else:
             # Evaluate model with parser assistance.
@@ -193,7 +198,7 @@ def evaluate(args, env, dataset, logger):
             src_i = torch.LongTensor(example['src_i'])
             src_i.to(model.device)
 
-            top = model.evaluate(
+            top, _ = model.evaluate(
                 nlp, src_i.to(model.device), src_norm,
                 num_parsers=args.beam_width,
                 beam_width=args.beam_width,
@@ -201,10 +206,12 @@ def evaluate(args, env, dataset, logger):
             )
 
             predictions = top['parser'].predictions
+            aborted = top['aborted']
 
         results = {
             'predictions': predictions,
-            'attn_used': False
+            'attn_used': False,
+            'aborted': aborted
         }
 
         if model.attention:
@@ -241,6 +248,11 @@ def main(args, logger):
             f'gold accuracy on dataset \'{args.eval}\''
         )
 
+        logger['log'].log(
+            f'[INFO {datetime.now()}]    {scores["aborted"]} '
+            f'aborted parses'
+        )
+
         logger['log'].close()
 
     else:
@@ -268,10 +280,10 @@ if __name__ == '__main__':
                         help='Turns off parser-assisted decoding.')
 
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_180.pt',
-        '--eval',           'compiled/geoquery.test.pt',
+        '--model',          'compiled/geoquery-model.model_step_115.pt',
+        '--eval',           'compiled/geoquery_sql.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '1'
+        '--beam_width',     '3'
     ])
 
     # args = parser.parse_args([

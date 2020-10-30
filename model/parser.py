@@ -91,7 +91,7 @@ class LALR(LALRBase):
     def __init__(self, nlp):
         super(LALR, self).__init__(nlp)
 
-        self.__cache = {
+        self.cache = {
             'state_stack': self.state_stack[:],
             'invalid': []
         }
@@ -133,7 +133,7 @@ class LALR(LALRBase):
         try:
             action, arg = self.states[state][symbol.type]
 
-            self.__cache = {
+            self.cache = {
                 'state_stack': self.state_stack[:],
                 'invalid': []
             }
@@ -153,8 +153,8 @@ class LALR(LALRBase):
         except KeyError:
 
             # Recover from parsing error.
-            self.__cache['invalid'].append(symbol)
-            self.state_stack = self.__cache['state_stack']
+            self.cache['invalid'].append(symbol)
+            self.state_stack = self.cache['state_stack']
 
             state = self.state_stack[-1]
             next_ = self.lexer.next(state)
@@ -184,7 +184,7 @@ class StochasticLALR(LALRBase):
         self.beam_width = beam_width
         self.max_cycles = max_cycles
 
-        self.__cache = {
+        self.cache = {
             'state_stack': self.state_stack[:],
             'invalid': []
         }
@@ -194,7 +194,8 @@ class StochasticLALR(LALRBase):
             'parser': LALR(self.nlp),
             'log-probabilities': [],
             'confidence': 0,
-            'memory_bank': memory_bank
+            'memory_bank': memory_bank,
+            'aborted': False
         }]
 
         while not self.terminated:
@@ -204,31 +205,28 @@ class StochasticLALR(LALRBase):
             for parsepath in parsepaths:
                 subparser = parsepath['parser']
 
-                if not subparser.terminated:
+                # Search for cycles in paths and
+                # and discard paths beginning the
+                # 'max_cycle'-th cycle.
+                if self.max_cycles \
+                        and self.__cycle_detection(
+                            self.max_cycles,
+                            parsepath,
+                            interrupt=True
+                        ):
+
+                    parsepath['aborted'] = True
+
+                if not subparser.terminated \
+                        and not parsepath['aborted']:
+
                     self.terminated = False
                     advanced = self.__subparse(parsepath)
                     updated.extend(advanced)
 
                 else:
+
                     updated.append(parsepath)
-
-            # Search for cycles in paths and
-            # and discard paths beginning the
-            # 'max_cycle'-th cycle.
-            for i in range(len(updated)):
-
-                if self.max_cycles and self.__cycle_detection(
-                    self.max_cycles,
-                    updated[i]
-                ):
-
-                    # Mark for removal.
-                    updated[i] = None
-
-            updated = list(filter(
-                (lambda x: x is not None),
-                updated
-            ))
 
             del parsepaths[:]
             updated = self.__topn_paths(
@@ -241,14 +239,16 @@ class StochasticLALR(LALRBase):
         top = self.__topn_paths(1, parsepaths)[0]
         top = {
             'parser': top['parser'],
-            'confidence': top['confidence']
+            'confidence': top['confidence'],
+            'aborted': parsepath['aborted']
         }
 
         candidates = []
         for parsepath in parsepaths:
             candidates.append({
                 'parser': parsepath['parser'],
-                'confidence': parsepath['confidence']
+                'confidence': parsepath['confidence'],
+                'aborted': parsepath['aborted']
             })
 
         return top, candidates
@@ -385,26 +385,71 @@ class StochasticLALR(LALRBase):
         token = Token(symbol.type, copy_t)
         return token
 
-    def __cycle_detection(self, max_cycles, parsepath):
+    def __cycle_detection(self, max_cycles, parsepath, interrupt=False):
+        """
+        The decoder, especially when it is not properly trained,
+        may get stuck in a loop, repeating the same sequence over
+        and over. Such repeating patterns are detected here and
+        a corresponding signal is sent to the caller if the max
+        number of repeats have been detected.
+
+        :param model_cycle: the maximal number the decoder can
+                            cycle through/repeat a sequence.
+        :param parsepath:   the current parsepath considered.
+        :param interrupt:   tries to interrupt cycle by adding
+                            beginning of cycle token to list of
+                            invalid tokens.
+        :returns:           false if no cycle is detected, true
+                            and the beginning of the repeated
+                            sequence if a pattern is repeated
+                            at least 'max_cycles' times.
+        """
+
         seq = np.array(parsepath['parser'].predictions[:])
         seq_shifted = seq[:]
 
         start_i = 2 * max_cycles
         for i in range(start_i, len(seq)):
+            # Computing "autocorrelation" between sequence
+            # and shifted version of itself.
             matched = np.abs(seq[i:] - seq_shifted[:-i])
 
             if len(matched) > (i * max_cycles):
 
-                slice_ = matched[-(i * max_cycles):]
-                if not np.sum(slice_):
-                    return True
+                # Check if the tail of the matched
+                # sequence is zero.
+                sos = -(i * max_cycles)
+                tail = matched[sos:]
+                if not np.sum(tail):
+
+                    # Try to interrupt sequence by adding
+                    # first token in repeated sequence to
+                    # invalid list. Only possible if there
+                    # is more than one token to choose from.
+                    if self.__interrupt(seq[sos], parsepath):
+
+                        # TODO: Implement interrupt.
+                        pass
+
+                    else:
+
+                        # Parse has failed.
+                        return True
 
             else:
+
+                # No more than 'max_cycles'-1 cycles.
                 break
 
         return False
 
+    def __interrupt(self, index, parsepath):
+        # TODO: Implement interrupt.
+        return False
+
     def __topn_paths(self, n, parsepaths):
+
+        # TODO: Prioritize unaborted parsepaths.
 
         def predicate(i):
             return i['confidence']

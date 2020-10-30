@@ -496,12 +496,12 @@ class Vocab:
 
         extended_vocab['i2w'].update({
             base_i2w_len+k: v
-            for k, v in vocab['i2w'].items()
+            for k, v in vocab._i2w.items()
         })
 
         extended_vocab['w2i'].update({
             k: base_w2i_len+int(v)
-            for k, v in vocab['w2i'].items()
+            for k, v in vocab._w2i.items()
         })
 
         return Vocab(extended_vocab)

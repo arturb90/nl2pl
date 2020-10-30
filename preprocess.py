@@ -461,10 +461,10 @@ def __build_fields(nlp, sample, vocab):
     # Create a mini sample vocab for copying. The target
     # vocabulary is dynamically extended by this sample
     # vocab in case copy attention is used.
-    sample_i2w = {i: t for i, t in enumerate(src_tokens)}
-    sample_w2i = {t: i for i, t in enumerate(src_tokens)}
-    sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
-    tgt_vocab_ext = vocab['tgt'].extend(sample_vocab, copy=True)
+    # sample_i2w = {i: t for i, t in enumerate(src_tokens)}
+    # sample_w2i = {t: i for i, t in enumerate(src_tokens)}
+    # sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
+    # tgt_vocab_ext = vocab['tgt'].extend(sample_vocab, copy=True)
 
     # Create alignment vector specifying which target
     # tokens should be copied from the input sequence
@@ -550,10 +550,14 @@ if __name__ == '__main__':
                         help='Check dataset and parse target samples.')
 
     args = parser.parse_args([
-        '--grammar', 'data/grammars/expression.lark',
-        '--src_train', 'data/datasets/expression/expr-src_train.txt',
-        '--tgt_train', 'data/datasets/expression/expr-tgt_train.txt',
-        '--save_data', 'compiled/expr',
+        '--grammar', 'data/grammars/geoquery-sql-anon.lark',
+        '--src_train',  'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_train.txt',
+        '--tgt_train',  'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_train.txt',
+        '--src_dev',    'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_dev.txt',
+        '--tgt_dev',    'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_dev.txt',
+        '--src_test',   'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_test.txt',
+        '--tgt_test',   'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_test.txt',
+        '--save_data', 'compiled/geoquery',
         '--start', 'start'
     ])
 

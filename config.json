@@ -2,14 +2,14 @@
 	"models": [
 		{
 			"id": 0,
-			"model": "compiled/geoquery-model.pt",
+			"model": "compiled/geoquery-model.model_step_180.pt",
 			"opt": {
 				"beam_width": 1
 			}
 		},
 		{
 			"id": 1,
-			"model": "compiled/atis-model.pt",
+			"model": "compiled/geoquery-model.model_step_180.pt",
 			"opt": {
 				"beam_width": 1
 			}
