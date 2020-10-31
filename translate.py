@@ -158,14 +158,6 @@ def evaluate(args, env, dataset, logger):
         f'examples evaluated'
     )
 
-    if model.copy_attention:
-        # If we use copy attention we have
-        # to evaluate against the extended vocabulary
-        # which is the union of encoder and decoder
-        # vocabulary.
-
-        vocab = vocab['tgt'].extend(vocab['src'])
-
     scorer = Scorer(nlp, vocab)
     for example in dataset:
         tgt = example['tgt_i'][1:]
@@ -202,18 +194,13 @@ def evaluate(args, env, dataset, logger):
             predictions = dec_outs.argmax(1)
             # No parse to abort.
             aborted = False
-            # TODO: Replace pointer tokens with resultant
-            # copy token from input sequence.
 
         else:
 
             # Evaluate model with parser assistance.
-            src_norm = nlp.normalize(example['src'], True)
-            src_i = torch.LongTensor(example['src_i'])
-            src_i.to(model.device)
 
             top, _ = model.evaluate(
-                nlp, src_i.to(model.device), src_norm,
+                nlp, example,
                 num_parsers=args.beam_width,
                 beam_width=args.beam_width,
                 max_cycles=2
@@ -225,12 +212,19 @@ def evaluate(args, env, dataset, logger):
         results = {
             'predictions': predictions,
             'attn_used': False,
+            'copy_used': False,
             'aborted': aborted
         }
 
         if model.attention:
             results.update({
                 'attn_used': True
+            })
+
+        if model.copy_attention:
+            results.update({
+                'copy_used': True,
+                'alignment': example['alignment']
             })
 
         scorer.score(results, tgt)
@@ -297,10 +291,10 @@ if __name__ == '__main__':
                         help='Turns off parser-assisted decoding.')
 
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_115.pt',
-        '--eval',           'compiled/geoquery_sql.test.pt',
+        '--model',          'compiled/geoquery-model.model_step_180.pt',
+        '--eval',           'compiled/geoquery.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '3'
+        '--beam_width',     '1'
     ])
 
     # args = parser.parse_args([

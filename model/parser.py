@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from lark import Token
 
+from util.nlp import Vocab
+
 
 def filter_unary(nlp, tokens):
     parser = LALR(nlp)
@@ -302,9 +304,11 @@ class StochasticLALR(LALRBase):
         updated = []
 
         while beam_width > 0 and next_:
+
             predictions = self.__pick(next_, scores, beam_width)
 
             for p in predictions:
+
                 copy = deepcopy(parsepath)
                 subparser = copy['parser']
 
@@ -316,11 +320,16 @@ class StochasticLALR(LALRBase):
                 memory_bank = parsepath['memory_bank']
                 if memory_bank['copy_attention'] \
                         and symbol.type in self.nlp.OPERATOR:
-                    token = self.__resolve_operator(symbol, memory_bank)
+
+                    # Set predicted index to index of predicted
+                    # token from the extended vocabulary.
+                    index, token = self.__resolve_operator(
+                        symbol, memory_bank
+                    )
 
                 try:
                     subparser.parse(token)
-                    subparser.predictions.append(p[0].item())
+                    subparser.predictions.append(index)
                     i = next_.index(symbol)
                     beam_width -= 1
                     next_.pop(i)
@@ -337,6 +346,7 @@ class StochasticLALR(LALRBase):
                     updated.append(copy)
 
                 except KeyError:
+
                     i = next_.index(symbol)
                     next_.pop(i)
 
@@ -346,7 +356,8 @@ class StochasticLALR(LALRBase):
 
         operator = self.nlp.OPERATOR[symbol.type]
         copy_weights = memory_bank['copy_weights']
-        inp = memory_bank['enc_inp'][1:-1]
+        input_fields = memory_bank['input_fields']
+        enc_inp = self.nlp.normalize(input_fields['src'])
         copy_weights = copy_weights[:, 1:-1]
 
         shape = (1, copy_weights.shape[1])
@@ -357,15 +368,19 @@ class StochasticLALR(LALRBase):
         )
 
         torch.topk(
-            copy_weights, len(inp),
+            copy_weights, len(enc_inp),
             out=(val_buffer, idx_buffer)
         )
 
+        tgt_vocab_len = len(self.nlp.vocab['tgt'])
+        input_vocab = Vocab(input_fields['sample_vocab'])
+        extended_vocab = self.nlp.vocab['tgt'].extend(input_vocab)
         idx_buffer = idx_buffer[0].tolist()
-        copy_t = f'<{operator.type}>'
+        copy_t = symbol.value
 
         if idx_buffer:
-            copy_t = inp[idx_buffer[0]]
+            copy_t = enc_inp[idx_buffer[0]]
+            copy_i = extended_vocab.w2i(copy_t)
             idx_buffer = idx_buffer[1:]
 
         while not operator.target.match(copy_t):
@@ -374,16 +389,19 @@ class StochasticLALR(LALRBase):
             # likely copy token.
 
             if idx_buffer:
-                copy_t = inp[idx_buffer[0]]
+                copy_t = enc_inp[idx_buffer[0]]
+                copy_i = tgt_vocab_len + input_vocab.w2i(copy_t)
                 idx_buffer = idx_buffer[1:]
 
             else:
                 # Fallback if no viable token found.
-                copy_t = f'<{operator.type}>'
+                copy_t = symbol.value
                 break
 
         token = Token(symbol.type, copy_t)
-        return token
+        # Remove input tokens target sample vocab.
+        self.nlp.vocab['tgt'].remove(input_vocab)
+        return copy_i, token
 
     def __cycle_detection(self, max_cycles, parsepath, interrupt=False):
         """

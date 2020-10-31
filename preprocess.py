@@ -458,13 +458,10 @@ def __build_fields(nlp, sample, vocab):
     tgt_tokens = nlp.tokenize(tgt, delimiters=True)
     tgt_tokens = filter_unary(nlp, tgt_tokens)
 
-    # Create a mini sample vocab for copying. The target
-    # vocabulary is dynamically extended by this sample
-    # vocab in case copy attention is used.
-    # sample_i2w = {i: t for i, t in enumerate(src_tokens)}
-    # sample_w2i = {t: i for i, t in enumerate(src_tokens)}
-    # sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
-    # tgt_vocab_ext = vocab['tgt'].extend(sample_vocab, copy=True)
+    # Create a mini sample vocab for copying.
+    sample_i2w = {i: t for i, t in enumerate(src_tokens)}
+    sample_w2i = {t: i for i, t in enumerate(src_tokens)}
+    sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
 
     # Create alignment vector specifying which target
     # tokens should be copied from the input sequence
@@ -507,7 +504,6 @@ def __build_fields(nlp, sample, vocab):
         'src_i': src_i,
         'tgt_i': tgt_i,
         'sample_vocab': sample_vocab,
-        'tgt_vocab_ext': tgt_vocab_ext,
         'alignment': alignment,
         'value_stacks': value_stacks,
         'stack_lens': stack_lens

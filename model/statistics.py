@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 
@@ -16,6 +17,13 @@ class Scorer:
         self.__aborted_parses = 0
 
     def score(self, results, tgt_seq):
+
+        if results['copy_used']:
+            tgt_seq = self.__resolve_alignment(
+                tgt_seq,
+                results['alignment']
+            )
+
         pred_seq = results['predictions']
         tgt_len = len(tgt_seq)
         pred_len = len(pred_seq)
@@ -34,11 +42,6 @@ class Scorer:
             for i, j in zip(pred_seq, tgt_seq)
         ]
 
-        # if not all(i is True for i in equal):
-        #     print('')
-        #     print(results['predictions'])
-        #     print(tgt_seq)
-
         self.__total_tokens += tgt_len
         self.__total_examples += 1
         self.__correct_tokens += sum(equal)
@@ -51,6 +54,20 @@ class Scorer:
             'gold_acc': self.__correct_examples / self.__total_examples,
             'aborted': self.__aborted_parses
         }
+
+    def __resolve_alignment(self, tgt_seq, alignment):
+
+        tgt_vec = np.array(tgt_seq)
+        align_vec = np.array(alignment[1:])
+        tgt_vocab_len = len(self.vocab['tgt'])
+
+        fn = (lambda a: a == 0)
+        result = np.where(
+            fn(align_vec), tgt_vec,
+            align_vec + tgt_vocab_len
+        )
+
+        return result.tolist()
 
 
 class Statistics:

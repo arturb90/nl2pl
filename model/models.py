@@ -310,7 +310,7 @@ class Seq2Seq(nn.Module):
 
     def evaluate(
         self, nlp,
-        src_i, src_w,
+        input_fields,
         num_parsers=1,
         beam_width=1,
         max_cycles=0
@@ -324,7 +324,11 @@ class Seq2Seq(nn.Module):
         )
 
         with torch.no_grad():
+            src_i = input_fields['src_i']
+            src_i = torch.LongTensor(src_i)
+            src_i.to(self.device)
             src_len = [len(src_i)]
+
             enc_inp = src_i.unsqueeze(1)
             enc_out, enc_state = self.encoder(enc_inp, src_len)
             enc_hid = enc_state['enc_hid']
@@ -373,7 +377,7 @@ class Seq2Seq(nn.Module):
                 'dec_inp': dec_inp,
                 'dec_hid': dec_hid,
                 'dec_cell': dec_cell,
-                'enc_inp': src_w,
+                'input_fields': input_fields,
                 'enc_out': enc_out,
                 'attention': self.attention,
                 'copy_attention': self.copy_attention,

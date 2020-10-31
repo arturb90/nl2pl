@@ -505,3 +505,12 @@ class Vocab:
         })
 
         return Vocab(extended_vocab)
+
+    def remove(self, vocab):
+
+        for key in vocab._w2i.keys():
+            del self._w2i[key]
+
+        ext_start = len(self._i2w) - len(vocab)
+        for key in range(ext_start, len(self._i2w)):
+            del self._i2w[key]
