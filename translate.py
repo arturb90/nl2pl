@@ -41,7 +41,8 @@ def load_model_env(model_path):
     vocab = {
         'src': Vocab(lang['vocab']['src']),
         'tgt': Vocab(lang['vocab']['tgt']),
-        'stack': Vocab(lang['vocab']['stack'])
+        'stack': Vocab(lang['vocab']['stack']),
+        'operator': Vocab(lang['vocab']['operator'])
     }
 
     # Load model environment (Neural Net, Parser, Utilities).
@@ -247,19 +248,24 @@ def evaluate(args, env, dataset, logger):
     return scorer.results()
 
 
-def __resolve_pointers(nlp, example, predictions, copy_weights):
+def __resolve_pointers(nlp, example, predictions, copy_w):
+    """
+    Resolves pointer operators in predicted sequence.
 
-    # Get operator indices.
-    op_i2w = {}
-    for op_name in nlp.OPERATOR:
-        op = nlp.OPERATOR[op_name]
-        token = repr(op.tokens[0])
-        i = nlp.vocab['tgt'].w2i(token)
-        op_i2w.update({i: op})
+    :param nlp:         nl processing and parsing utils.
+    :param example:     the example currently evaluated.
+    :param predictions: the predicted token sequence.
+    :param copy_w:      copy weights for each predicted token.
+    :returns:           the resolved token sequence, where copied
+                        indices correspond to the indices in the
+                        extended vocabulary.
+    """
+
+    op_vocab = nlp.vocab['operator']
 
     # Find operator indices in predicted sequence.
     pred_indices = []
-    for i in op_i2w.keys():
+    for i in op_vocab._i2w.keys():
         pred_indices.extend(
             (predictions == i).nonzero()
             .reshape(-1).tolist()
@@ -268,9 +274,9 @@ def __resolve_pointers(nlp, example, predictions, copy_weights):
     # Resolve operators.
     for i in pred_indices:
         pred_op = predictions[i]
-        op = op_i2w[pred_op.item()]
+        op = op_vocab.i2w([pred_op.item()])
         copy_index, _ = op.apply(
-            (example, copy_weights[i])
+            (example, copy_w[i])
         )
 
         predictions[i] = copy_index
@@ -330,11 +336,10 @@ if __name__ == '__main__':
                         help='Turns off parser-assisted decoding.')
 
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_180.pt',
+        '--model',          'compiled/geoquery-model.model_step_178.pt',
         '--eval',           'compiled/geoquery.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '1',
-        '--no_parser'
+        '--beam_width',     '1'
     ])
 
     # args = parser.parse_args([

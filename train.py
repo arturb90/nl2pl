@@ -54,15 +54,19 @@ def __save_model(model, model_opts, lang, epoch, best_epoch):
     torch.save(model_data, model_path)
 
 
-def validate(model, dataset, crit):
+def validate(env, dataset, crit):
     """
     Validates the latest model on dataset.
 
-    :param model:       the model after parameter update.
+    :param env:         environment including model
+                        and language data.
     :param dataset:     the validation dataset.
     :param epoch:       NLL loss criterion.
     :returns:           validation statistics.
     """
+
+    model = env['model']
+    lang = env['lang']
 
     # Set evaluation mode to turn
     # dropout off.
@@ -151,7 +155,7 @@ def validate(model, dataset, crit):
             dev_loss += batch_loss.item()
 
         statistics = Statistics(
-            dev_loss,
+            lang, dev_loss,
             len(dataiter),
             results
         )
@@ -159,16 +163,21 @@ def validate(model, dataset, crit):
     return statistics
 
 
-def train_epoch(model, dataset, opt, crit, epoch_n):
+def train_epoch(env, dataset, opt, crit, epoch_n):
     """
     Training for one epoch.
 
+    :param env:         environment including model
+                        and language data.
     :param dataset:     training dataset
     :param opt:         SGD optimizer.
     :param crit:        NLL loss criterion.
     :param epoch_n:     epoch number.
     :returns:           training statistics.
     """
+
+    model = env['model']
+    lang = env['lang']
 
     # Set to training mode.
     model.train()
@@ -281,7 +290,7 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
         logger['log'].log('')
 
     statistics = Statistics(
-        epoch_loss,
+        lang, epoch_loss,
         dataiter_len,
         results
     )
@@ -289,17 +298,19 @@ def train_epoch(model, dataset, opt, crit, epoch_n):
     return statistics
 
 
-def train(model, lang, datasets):
+def train(env, datasets):
     """
     Trains a semantic parser that translates natural
     language expressions to program code based on the
     language data provided.
 
-    :param model:       model to be trained.
-    :param lang:        language data for the model to be
-                        trained.
+    :param env:         environment including model and
+                        language data.
     :param datasets:    training and validation datasets.
     """
+
+    model = env['model']
+    lang = env['lang']
 
     # Zero is padding token and no alignment.
     crit = nn.NLLLoss(ignore_index=0, reduction='sum')
@@ -329,7 +340,7 @@ def train(model, lang, datasets):
     for epoch in range(1, args.epochs+1):
         since = time.time()
         statistics = train_epoch(
-            model, train_set,
+            env, train_set,
             opt, crit, epoch
         )
 
@@ -360,7 +371,7 @@ def train(model, lang, datasets):
 
         if 'dev' in datasets and args.validate:
             # Validate model.
-            statistics = validate(model, dev_set, crit)
+            statistics = validate(env, dev_set, crit)
 
             dev_loss = statistics.loss
             accuracy = statistics.accuracy
@@ -545,7 +556,7 @@ if __name__ == '__main__':
         '--dec_hidden_size',    '96',
         '--enc_emb_size',       '64',
         '--dec_emb_size',       '64',
-        '--batch_size',         '8',
+        '--batch_size',         '32',
         '--teacher_forcing',    '1.0',
         '--enc_rnn_dropout',    '0.0',
         '--dec_rnn_dropout',    '0.0',
@@ -559,11 +570,13 @@ if __name__ == '__main__':
     ])
 
     if validate_args(args):
+
         lang, datasets = io.load(args.data)
         vocab = {
             'src': Vocab(lang['vocab']['src']),
             'tgt': Vocab(lang['vocab']['tgt']),
             'stack': Vocab(lang['vocab']['stack']),
+            'operator': Vocab(lang['vocab']['operator'])
         }
 
         log = Logger(out_path=args.out)
@@ -577,4 +590,10 @@ if __name__ == '__main__':
 
         settings = model_settings(vocab, args)
         model = build_model(vocab, settings)
-        train(model, lang, datasets)
+
+        env = {
+            'model': model,
+            'lang': lang
+        }
+
+        train(env, datasets)

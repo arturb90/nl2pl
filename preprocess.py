@@ -171,7 +171,20 @@ def __build_vocab(nlp, datasets):
         'w2i': stack_w2i
     })
 
+    op_i2w, op_w2i = __operator_vocab(nlp, tgt_vocab)
+
+    vocab_dicts.update({'operator': {
+        'i2w': op_i2w,
+        'w2i': op_w2i
+    }})
+
+    op_vocab = Vocab({
+        'i2w': op_i2w,
+        'w2i': op_w2i
+    })
+
     vocab.update({'stack': stack_vocab})
+    vocab.update({'operator': op_vocab})
     return vocab, vocab_dicts
 
 
@@ -292,7 +305,8 @@ def __save_data(grammar, vocab, datasets):
     - <save_data>.lang.pt
 
     :param grammar:     the raw grammar file.
-    :param vocab:       encoder, decoder and stack vocabularies.
+    :param vocab:       encoder, decoder, operator and stack
+                        vocabularies.
     :param datasets:    all dataset preprocessed dataset splits.
     """
 
@@ -411,9 +425,9 @@ def __stack_vocab(nlp):
     the value stack of the parser. Builds the vocabulary
     for the stack encoder.
 
-    :param nlp:         nl processing and parsing utils.
-    :returns:           'i2w' and 'w2i' dictionaries taking
-                        indices to tokens and vice versa.
+    :param nlp: nl processing and parsing utils.
+    :returns:   'i2w' and 'w2i' dictionaries taking
+                indices to tokens and vice versa.
     """
 
     vocab = OrderedDict()
@@ -436,6 +450,29 @@ def __stack_vocab(nlp):
 
     i2w = {i: t for i, t in enumerate(vocab)}
     w2i = {t: i for i, t in enumerate(vocab)}
+
+    return i2w, w2i
+
+
+def __operator_vocab(nlp, tgt_vocab):
+    """
+    Collects operators from target vocabulary and stores them
+    in a small distinct vocabulary.
+
+    :param nlp:         nl processing and parsing utils.
+    :returns:           'i2w' and 'w2i' dictionaries taking
+                        indices to tokens and vice versa.
+    """
+
+    i2w = {}
+    w2i = {}
+
+    for op_name in nlp.OPERATOR:
+        op = nlp.OPERATOR[op_name]
+        t = repr(op.tokens[0])
+        i = tgt_vocab.w2i(t)
+        i2w.update({i: t})
+        w2i.update({t: i})
 
     return i2w, w2i
 
@@ -547,12 +584,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args([
         '--grammar', 'data/grammars/geoquery-sql-anon.lark',
-        '--src_train',  'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_train.txt',
-        '--tgt_train',  'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_train.txt',
-        '--src_dev',    'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_dev.txt',
-        '--tgt_dev',    'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_dev.txt',
-        '--src_test',   'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-src_test.txt',
-        '--tgt_test',   'data/datasets/geoquery/geo_sql/question_split/test/geo_sql-tgt_test.txt',
+        '--src_train',  'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_train.txt',
+        '--tgt_train',  'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_train.txt',
+        '--src_dev',    'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_dev.txt',
+        '--tgt_dev',    'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_dev.txt',
+        '--src_test',   'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_test.txt',
+        '--tgt_test',   'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_test.txt',
         '--save_data', 'compiled/geoquery',
         '--start', 'start'
     ])

@@ -72,7 +72,7 @@ class Scorer:
 
 class Statistics:
 
-    def __init__(self, loss, batch_count, results):
+    def __init__(self, lang, loss, batch_count, results):
 
         total_tokens = 0
         total_samples = 0
@@ -84,27 +84,19 @@ class Statistics:
             preds = results[i]['predictions']
             targets = results[i]['targets']
 
-            if results[i]['copy_attn_used']:
-                copy_preds = results[i]['copy_predictions']
-                copy_tgts = results[i]['copy_targets']
-
             # Set indices to zero where target is zero.
             indices = preds.argmax(1)
             indices = torch.where(targets == 0, targets, indices)
 
             if results[i]['copy_attn_used']:
+
                 # If copy attention is used, replace operator indices
                 # with the predicted index in the extended vocabulary,
-                # but only where an operator's index was actually predicted
-                _, copy_indices = copy_preds.topk(1, dim=1)
-                copy_indices = copy_indices.squeeze(1)
-                copy_indices = torch.where(
-                    copy_tgts == 0, copy_tgts, copy_indices
-                )
+                # but only where an operator's index was actually predicted.
+                copy_preds = results[i]['copy_predictions']
+                copy_tgts = results[i]['copy_targets']
 
-                # TODO: Set copy targets and copy indices to zero
-                # where no operator token was predicted.
-
+                # Set operator tokens to target in extended vocabulary.
                 tgt_vocab_size = results[i]['tgt_vocab_size']
                 copy_tgts = copy_tgts + tgt_vocab_size
                 targets = torch.where(
@@ -113,12 +105,20 @@ class Statistics:
                     copy_tgts
                 )
 
-                copy_indices = copy_indices + tgt_vocab_size
-                indices = torch.where(
-                    copy_indices == tgt_vocab_size,
-                    indices,
-                    copy_indices
-                )
+                # Collect operator tokens from predicted sequence.
+                op_vocab = lang['vocab']['operator']
+                pred_indices = []
+                for i in op_vocab['i2w'].keys():
+                    pred_indices.extend(
+                        (indices == i).nonzero()
+                        .reshape(-1).tolist()
+                    )
+
+                # Set operator token to predicted token in
+                # extended vocabulary.
+                for i in pred_indices:
+                    copy_i = torch.argmax(copy_preds[i])
+                    indices[i] = tgt_vocab_size + copy_i
 
             # Add number of nonzero targets.
             nonzero_tgt = targets[targets.nonzero()].squeeze()

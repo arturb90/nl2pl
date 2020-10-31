@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from lark import Token
 
-from util.nlp import Vocab
-
 
 def filter_unary(nlp, tokens):
     parser = LALR(nlp)
