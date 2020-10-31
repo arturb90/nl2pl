@@ -1,6 +1,7 @@
 import abc
 import re
 import string
+import torch
 
 from collections import defaultdict
 from lark import Tree, Token
@@ -319,9 +320,9 @@ class NLP:
         result = {}
 
         op_def = {
-            '*':    (lambda src, dst, t: self.__STAR(src, dst, t)),
-            '@':    (lambda src, dst, t: self.__ANON(src, dst, t)),
-            '#':    (lambda src, dst, t: self.__HASH(src, dst, t))
+            '*': (lambda t, args: self.__STAR(t, args)),
+            '@': (lambda t, args: self.__ANON(t, args)),
+            '#': (lambda t, args: self.__HASH(t, args))
         }
 
         for op in operators:
@@ -330,41 +331,80 @@ class NLP:
             args = op['args']
 
             op_applied = (
-                lambda src, dst, type_, t: op_def[type_](src, dst, t)
+                lambda t, args: op_def[t.type[:1]](t, args)
             )
 
             result.update({f'{name}': [type_, args, op_applied]})
 
         return result
 
-    def __STAR(self, src, dst, t):
-        out_src = src
-        # TODO: Copy?
-        out_dst = dst
+    def __STAR(self, t, args):
 
-        term_type = t.name
-        for i in range(len(out_dst)):
-            token = out_dst[i]
+        input_fields = args[0]
+        copy_weights = args[1]
 
-            if token.type == term_type:
-                terminal = TerminalOp(t.tdef, t.operator)
-                terminal.source = t.source
-                terminal.target = t.target
-                terminal.tokens = [token]
-                out_dst[i] = terminal
+        src_t = self.normalize(input_fields['src'])
+        copy_weights = copy_weights[:, 1:-1]
 
-        return out_src, out_dst
+        shape = (1, copy_weights.shape[1])
+        val_buffer = torch.empty(shape)
+        idx_buffer = torch.empty(
+            shape,
+            dtype=torch.long
+        )
 
-    def __ANON(self, src, dst, t):
+        torch.topk(
+            copy_weights, len(src_t),
+            out=(val_buffer, idx_buffer)
+        )
+
+        tgt_vocab_len = len(self.vocab['tgt'])
+        input_vocab = Vocab(input_fields['sample_vocab'])
+        extended_vocab = self.vocab['tgt'].extend(input_vocab)
+        idx_buffer = idx_buffer[0].tolist()
+        copy_t = f'<{t.type}>'
+
+        if idx_buffer:
+            copy_t = src_t[idx_buffer[0]]
+            copy_i = extended_vocab.w2i(copy_t)
+            idx_buffer = idx_buffer[1:]
+
+        while not t.target.match(copy_t):
+            # If selected word does not match the regex
+            # defined by the operator, try the noxt most
+            # likely copy token.
+
+            if idx_buffer:
+                copy_t = src_t[idx_buffer[0]]
+                copy_i = tgt_vocab_len + input_vocab.w2i(copy_t)
+                idx_buffer = idx_buffer[1:]
+
+            else:
+                # Fallback if no viable token found.
+                copy_t = f'<{t.type}>'
+                break
+
+        token = Token(t.name, copy_t)
+        # Remove input tokens from target vocab.
+        self.vocab['tgt'].remove(input_vocab)
+        return copy_i, token
+
+    def __ANON(self, t, args):
+
+        # TODO: Implement.
+        src, dst = args
         out_src = src
         out_dst = dst
 
         out_src = t.source.sub(f'<{t.name}>', src)
-        _, out_dst = self.__STAR(src, dst, t)
+        _, out_dst = self.__STAR(t, src, dst)
 
         return out_src, out_dst
 
-    def __HASH(self, src, dst, t):
+    def __HASH(self, t, args):
+
+        # TODO: Implement.
+        src, dst = args
         out_src = src
         out_dst = dst
 
@@ -421,8 +461,8 @@ class TerminalOp(Terminal):
         self.source = None
         self.target = None
 
-    def apply(self, src, dst):
-        return self.op_def(src, dst, self.type[:1], self)
+    def apply(self, args):
+        return self.op_def(self, args)
 
     def parse_args(self):
         source = []

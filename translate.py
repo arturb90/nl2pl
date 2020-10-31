@@ -195,6 +195,18 @@ def evaluate(args, env, dataset, logger):
             # No parse to abort.
             aborted = False
 
+            # Resolve copy pointers.
+            op_indices = []
+            for op in nlp.OPERATOR:
+                token = str(op.tokens[0])
+                op_indices.append(vocab['tgt'].w2i(token))
+
+            sample_vocab = example['sample_vocab']
+            extended_vocab = vocab['tgt'].extend(sample_vocab)
+            inp_tokens = nlp.normalize(example['src'])
+
+            vocab['tgt'].remove(sample_vocab)
+
         else:
 
             # Evaluate model with parser assistance.
