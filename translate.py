@@ -163,10 +163,10 @@ def evaluate(args, env, dataset, logger):
         tgt = example['tgt_i'][1:]
 
         if args.no_parser:
+
             # Evaluate model without parser assistance.
             # TODO: Gives wrong results when stack
             # encodings were used.
-
             alignment = example['alignment']
             tgt_i = torch.LongTensor(example['tgt_i'])
             src_i = torch.LongTensor(example['src_i'])
@@ -196,21 +196,17 @@ def evaluate(args, env, dataset, logger):
             aborted = False
 
             # Resolve copy pointers.
-            op_indices = []
-            for op in nlp.OPERATOR:
-                token = str(op.tokens[0])
-                op_indices.append(vocab['tgt'].w2i(token))
-
-            sample_vocab = example['sample_vocab']
-            extended_vocab = vocab['tgt'].extend(sample_vocab)
-            inp_tokens = nlp.normalize(example['src'])
-
-            vocab['tgt'].remove(sample_vocab)
+            if model.copy_attention:
+                predictions = __resolve_pointers(
+                    nlp,
+                    example,
+                    predictions,
+                    output['copy_weights'][1:]
+                )
 
         else:
 
             # Evaluate model with parser assistance.
-
             top, _ = model.evaluate(
                 nlp, example,
                 num_parsers=args.beam_width,
@@ -249,6 +245,37 @@ def evaluate(args, env, dataset, logger):
 
     logger['line'].close()
     return scorer.results()
+
+
+def __resolve_pointers(nlp, example, predictions, copy_weights):
+
+    # Get operator indices.
+    op_i2w = {}
+    for op_name in nlp.OPERATOR:
+        op = nlp.OPERATOR[op_name]
+        token = repr(op.tokens[0])
+        i = nlp.vocab['tgt'].w2i(token)
+        op_i2w.update({i: op})
+
+    # Find operator indices in predicted sequence.
+    pred_indices = []
+    for i in op_i2w.keys():
+        pred_indices.extend(
+            (predictions == i).nonzero()
+            .reshape(-1).tolist()
+        )
+
+    # Resolve operators.
+    for i in pred_indices:
+        pred_op = predictions[i]
+        op = op_i2w[pred_op.item()]
+        copy_index, _ = op.apply(
+            (example, copy_weights[i])
+        )
+
+        predictions[i] = copy_index
+
+    return predictions
 
 
 def main(args, logger):
@@ -306,7 +333,8 @@ if __name__ == '__main__':
         '--model',          'compiled/geoquery-model.model_step_180.pt',
         '--eval',           'compiled/geoquery.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '1'
+        '--beam_width',     '1',
+        '--no_parser'
     ])
 
     # args = parser.parse_args([
