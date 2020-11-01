@@ -550,7 +550,7 @@ if __name__ == '__main__':
         '--save',               'compiled/geoquery-model',
         '--out',                'compiled/log_train.txt',
         '--epochs',             '1000',
-        '--early_stop',         '200',
+        '--early_stop',         '500',
         '--layers',             '1',
         '--enc_hidden_size',    '96',
         '--dec_hidden_size',    '96',
@@ -562,10 +562,9 @@ if __name__ == '__main__':
         '--dec_rnn_dropout',    '0.0',
         '--enc_emb_dropout',    '0.0',
         '--dec_emb_dropout',    '0.0',
-        '--attention',
         '--validate',
+        '--attention',
         '--bidirectional',
-        '--copy',
         '--best_gold'
     ])
 

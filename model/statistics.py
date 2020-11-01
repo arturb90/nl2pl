@@ -84,8 +84,11 @@ class Statistics:
             preds = results[i]['predictions']
             targets = results[i]['targets']
 
-            # Set indices to zero where target is zero.
+            # Set indices to zero where target is zero. Set
+            # index to -1 where padding token was predicted
+            # such that it does not infer with real padding tokens.
             indices = preds.argmax(1)
+            indices[indices == 0] = -1
             indices = torch.where(targets == 0, targets, indices)
 
             if results[i]['copy_attn_used']:
