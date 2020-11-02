@@ -141,7 +141,8 @@ class NLP:
 
     def normalize(self, text, delimiters=False):
         text = self.__pad_punctuation(text)
-        tokens = text.strip().split()
+        text = text.strip().lower()
+        tokens = text.split()
 
         if delimiters:
             sos_token = self.mark.inp['SOS']
