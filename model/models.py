@@ -15,6 +15,18 @@ device = torch.device(
 
 
 def model_settings(vocab, args):
+    '''
+    Builds a dictionary containing all the configuration
+    settings for a sequence-to-sequence model from the
+    arguments passed as training parameters.
+
+    :param vocab:   the vocabulary corresponding to the
+                    environment the model is associated
+                    with.
+    :param args:    the arguments passed to the training
+                    script.
+    :returns:       the model confoguration settings.
+    '''
 
     dec_inp_size = args.dec_emb_size
     stack_align_out = None
@@ -76,6 +88,19 @@ def model_settings(vocab, args):
 
 
 def build_model(vocab, settings):
+    '''
+    Builds a model from a settings dictionary containing
+    the model configuration data.
+
+    :param vocab:       the vocabulary corresponding to the
+                        environment the model is associated
+                        with.
+    :param settings:    the model configuration settings.
+                        script.
+    :returns:           a pytorch module instance that is
+                        configured according to the model
+                        settings.
+    '''
 
     attention = None
     if settings['attention']:
@@ -142,11 +167,44 @@ def build_model(vocab, settings):
 
 
 def __initialize(model):
+    # Parameter initialization.
     for name, param in model.named_parameters():
         nn.init.uniform_(param.data, -0.08, 0.08)
 
 
 class Seq2Seq(nn.Module):
+    '''
+    The configurable main module where all threads come together.
+    A Sequence-to-Sequence model according to Sutskever et al.
+    https://arxiv.org/abs/1409.3215
+
+    Consists of a encoder and a decoder recurrent neural network.
+    The encoder reads in input tokens (a natural language string)
+    and the decoder produces output tokens (programming language
+    tokens) conditioned on the encoder context.
+
+    May be used with content-based attention....
+    (https://arxiv.org/abs/1409.0473)
+
+    ... and copy attention pointers.
+    (https://arxiv.org/abs/1606.03622)
+
+    See 'train.py' for a full documentation of possible
+    configuration options.
+
+    :ivar device:           the device on which pytorch allocates
+                            tensors. corresponds to your gpu if you
+                            have a CUDA enabled gpu, otherwise cpu.
+    :ivar encoder:          the encoder module associated with this
+                            sequence-to-sequence model.
+    :ivar decoder:          the decoder module associated with this
+                            sequence-to-sequence model.
+    :ivar attention:        content-based attention module over the
+                            encoder hidden states.
+    :ivar copy_attention:   copy attention module for generating
+                            pointers over the input sequence and
+                            copying the respective tokens.
+    '''
 
     def __init__(self,
                  device,
@@ -213,6 +271,32 @@ class Seq2Seq(nn.Module):
         stack_lens,
         teacher_forcing=0
     ):
+        '''
+        The forward-pass for the sequence-to-sequence model.
+        Delegates to the respective submodules associated
+        wit this module.
+
+        :param src_pad:         a padded source sample batch
+                                in integer representation.
+        :param tgt_pad:         a padded target sample batch
+                                in integer representation.
+        :param src_lens:        original source sample lengths
+                                before batching.
+        :param tgt_lens:        original target sample lengths
+                                before batching.
+        :param align_pad:       the padded alignment vectors for
+                                for each target sample.
+        :param stack_pad:       the padded value stack contents
+                                for each position in each target
+                                sample.
+        :param stack_lens:      the original value stack contents
+                                before padding.
+        :param teacher_forcing: the ratio of decoders own predictions
+                                and ground truth targets fed into the
+                                decoder at each decoding step.
+        :returns:               all decoder outputs and copy weights
+                                for each target sample in the batch.
+        '''
 
         batch_size = tgt_pad.size(1)
         target_len = tgt_pad.size(0)
@@ -336,6 +420,28 @@ class Seq2Seq(nn.Module):
         beam_width=1,
         max_cycles=0
     ):
+        '''
+        The evaluation routine for the trained model. Uses a LALR(1)
+        parser to enforce syntactically valid sequences during decoding,
+        thus potentially correcting the decoder when it predicts a token
+        that is syntactically unviable.
+
+        :param nlp:             nl processing and parsing utils.
+        :param input_fields:    fields associated with the input source
+                                sequence passed during evaluation and
+                                inference.
+        :param num_parsers:     the maximal number of subparsers to use
+                                with beam search.
+        :param beam_width:      the beam width for beam search-
+        :param max_cycles:      the parser, especially if poorly trained
+                                may predict the same sequences over and
+                                over again. define a maximum number of
+                                such repeated cycles after parsing is
+                                aborted.
+        :returns:               the parse with highest confidence and a
+                                number of other likely candidate parses
+                                if beam search was used.
+        '''
 
         parser = StochasticLALR(
             nlp, self.decoder,
