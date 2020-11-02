@@ -27,12 +27,14 @@ def model_settings(vocab, args):
         align_out = args.dec_hidden_size
 
         if args.bidirectional:
-            dec_inp_size += (enc_hid_size * 2)
             align_in = enc_hid_size * 2
+            if args.attention:
+                dec_inp_size += (enc_hid_size * 2)
 
         else:
-            dec_inp_size += enc_hid_size
             align_in = enc_hid_size
+            if args.attention:
+                dec_inp_size += enc_hid_size
 
     if args.stack_encoding:
         stack_hid_size = args.stack_hidden_size
@@ -161,6 +163,25 @@ class Seq2Seq(nn.Module):
         self.attention = attention
         self.copy_attention = copy_attention
 
+        # Map encoder hidden and cell dimensions
+        # to decoder hidden and cell dimensions.
+        dec_hid_size = self.decoder.hid_size
+        enc_hid_size = self.encoder.hid_size
+        if self.encoder.bidirectional:
+            enc_hid_size *= 2
+
+        self.enc2dec_hidden = nn.Linear(
+            enc_hid_size,
+            dec_hid_size,
+            bias=True
+        )
+
+        self.enc2dec_cell = nn.Linear(
+            enc_hid_size,
+            dec_hid_size,
+            bias=True
+        )
+
         if self.attention:
             # Precomputing for encoder attention weights.
             out_size = self.attention.out_size
@@ -216,13 +237,11 @@ class Seq2Seq(nn.Module):
         enc_out, enc_state = self.encoder(src_pad, src_lens)
         enc_hid = enc_state['enc_hid']
         enc_cell = enc_state['enc_cell']
-
         dec_inp = tgt_pad[0, :]
 
         if self.encoder.bidirectional:
-            # When encoder is bidirectional, use
-            # forward pass hidden state as initial
-            # decoder hidden state.
+            # Flatten forward and backward
+            # hidden and cell states.
             num_directions = 2
             enc_hid = enc_hid.view(
                 self.encoder.layers,
@@ -238,13 +257,15 @@ class Seq2Seq(nn.Module):
                 self.encoder.hid_size
             )
 
-            # 0 corresponds to forward pass.
-            dec_hid = enc_hid[:, 0, :, :]
-            dec_cell = enc_cell[:, 0, :, :]
+            enc_hid = enc_hid.transpose(1, 2)
+            enc_cell = enc_cell.transpose(1, 2)
+            enc_hid = enc_hid.flatten(start_dim=2, end_dim=3)
+            enc_cell = enc_cell.flatten(start_dim=2, end_dim=3)
 
-        else:
-            dec_hid = enc_hid
-            dec_cell = enc_cell
+        # Map encoder hidden and cell dimensions
+        # to decoder hidden and cell dimensions.
+        dec_hid = self.enc2dec_hidden(enc_hid)
+        dec_cell = self.enc2dec_cell(enc_cell)
 
         u_align = None
         if self.attention:
@@ -339,9 +360,8 @@ class Seq2Seq(nn.Module):
             dec_inp = torch.LongTensor((sos_token,)).to(self.device)
 
             if self.encoder.bidirectional:
-                # When encoder is bidirectional, use
-                # forward pass hidden state as initial
-                # decoder hidden state.
+                # Flatten forward and backward
+                # hidden and cell states.
                 num_directions = 2
                 enc_hid = enc_hid.view(
                     self.encoder.layers,
@@ -355,13 +375,15 @@ class Seq2Seq(nn.Module):
                     self.encoder.hid_size
                 )
 
-                # 0 corresponds to forward pass.
-                dec_hid = enc_hid[:, 0, :, :]
-                dec_cell = enc_cell[:, 0, :, :]
+                enc_hid = enc_hid.transpose(1, 2)
+                enc_cell = enc_cell.transpose(1, 2)
+                enc_hid = enc_hid.flatten(start_dim=2, end_dim=3)
+                enc_cell = enc_cell.flatten(start_dim=2, end_dim=3)
 
-            else:
-                dec_hid = enc_hid
-                dec_cell = enc_cell
+            # Map encoder hidden and cell dimensions
+            # to decoder hidden and cell dimensions.
+            dec_hid = self.enc2dec_hidden(enc_hid)
+            dec_cell = self.enc2dec_cell(enc_cell)
 
             u_align = None
             if self.attention:

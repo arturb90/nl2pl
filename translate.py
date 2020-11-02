@@ -68,6 +68,7 @@ def load_model_env(model_path):
 
     model_env = {
         'model': model,
+        'model_opt': model_opt,
         'vocab': vocab,
         'nlp': nlp
     }
@@ -75,7 +76,7 @@ def load_model_env(model_path):
     return model_env
 
 
-def translate(model_env, model_opt, src):
+def translate(model_env, src):
     """
     Translate a single natural language input string.
 
@@ -96,6 +97,7 @@ def translate(model_env, model_opt, src):
     unk_token = nlp.mark.inp['UNK']
     unk_index = vocab['src'].w2i(unk_token)
     # Get translation specific options.
+    model_opt = model_env['model_opt']
     opts = get_opts(model_opt)
 
     for t in tokens:
@@ -289,6 +291,7 @@ def main(args, logger):
     env = load_model_env(args.model)
 
     if args.eval:
+
         dataset = torch.load(args.eval)
         scores = evaluate(args, env, dataset, logger)
 
@@ -311,8 +314,14 @@ def main(args, logger):
 
     else:
 
-        # TODO: Run translation server.
-        pass
+        model = {0: env}
+
+        # TODO: Run server.
+
+        logger['log'].log(
+            f'[INFO {datetime.now()}]    translation service'
+            ' successfully started.'
+        )
 
 
 if __name__ == '__main__':
@@ -335,11 +344,18 @@ if __name__ == '__main__':
     parser.add_argument('--no_parser', action='store_true',
                         help='Turns off parser-assisted decoding.')
 
+    # Server options.
+    parser.add_argument('--host', type=str, default='localhost',
+                        help='Server host address.')
+
+    parser.add_argument('--port', type=int, default=4996,
+                        help='Port on which to serve.')
+
     args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_178.pt',
+        '--model',          'compiled/geoquery-model.model_step_804.pt',
         '--eval',           'compiled/geoquery.test.pt',
         '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '1'
+        '--beam_width',     '10'
     ])
 
     # args = parser.parse_args([

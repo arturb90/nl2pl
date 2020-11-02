@@ -14,7 +14,8 @@ from flask import Flask, request
 
 from translate import load_model_env, translate
 
-app = Flask(__name__)
+app = None
+model_dict = None
 
 
 def validate_args(args):
@@ -45,6 +46,7 @@ def serve():
 
         # Evaluate data if valid.
         if validate_data(data):
+
             result = evaluate(data[0])
             response = {
                 'confidence': result['confidence'],
@@ -54,7 +56,7 @@ def serve():
     return response
 
 
-def evaluate(data):
+def evaluate(model_env, data):
     """
     Evaluate data received from client. Data must
     include a model id and an input source string.
@@ -65,19 +67,25 @@ def evaluate(data):
 
     src = data['src']
     model_id = data['id']
-    model_env = models[model_id]['model_env']
-    model_opt = models[model_id]['model_opt']
+    model_env = models[model_id]
 
     # Invoke the translate script.
-    result = translate(model_env, model_opt, src)
+    result = translate(model_env, src)
     return result
 
 
 def run(
+    models,
     host='localhost',
     port=4996,
     debug=False
 ):
+
+    global app
+    app = Flask(__name__)
+
+    global model_dict
+    model_dict = models
 
     # Start the flask app.
     app.run(
@@ -103,15 +111,28 @@ def load_models(config_path):
     for model_conf in config['models']:
         model_path = model_conf['model']
         model_env = load_model_env(model_path)
+        model_env['model_opt'] = model_conf['opt']
 
         # Unique ID for each loaded model enables
         # clients to address models individually.
-        models[model_conf['id']] = {
-            'model_env': model_env,
-            'model_opt': model_conf['opt']
-        }
+        models[model_conf['id']] = model_env
 
     return models
+
+
+def main2(
+    models,
+    host='localhost',
+    port=4996,
+    debug=False
+):
+
+    run(
+        host=args.host,
+        port=args.port,
+        models=models,
+        debug=False
+    )
 
 
 if __name__ == '__main__':
@@ -122,18 +143,19 @@ if __name__ == '__main__':
                         help='Path to server config file.')
 
     parser.add_argument('--host', type=str, default='localhost',
-                        help='Path to server config file.')
+                        help='Server host address.')
 
     parser.add_argument('--port', type=int, default=4996,
-                        help='Path to server config file.')
+                        help='Port on which to serve.')
 
     args = parser.parse_args()
     validate_args(args)
 
     models = load_models(args.config)
 
-    run(
+    main(
         host=args.host,
         port=args.port,
+        models=models,
         debug=False
     )
