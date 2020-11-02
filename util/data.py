@@ -1,11 +1,18 @@
 import torch
-import torch.nn.functional as F
 
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
 
 def collate_fn(batch):
+    '''
+    Batch-wise preprocessing and padding.
+
+    :param batch:  the current batch.
+    :returns:       padded sources, targets, alignments
+                    stacks and corresponding real lengths.
+    '''
+
     sources, targets, alignments, \
         stacks, stack_lens = zip(*batch)
 
@@ -46,6 +53,9 @@ def collate_fn(batch):
 
 
 class Dataset(Dataset):
+    '''
+    Pytorch dataset object.
+    '''
 
     def __init__(self, dataset, device):
         self.data = dataset

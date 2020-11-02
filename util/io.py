@@ -3,6 +3,7 @@ import torch
 
 
 def grammar(grammar_path):
+
     grammar_str = __load_file(grammar_path)
     return grammar_str
 
@@ -15,6 +16,11 @@ def data(
     src_test=None,
     tgt_test=None
 ):
+    '''
+    Loads the dataset files passed as arguments.
+
+    :returns:   dict containing the datasets.
+    '''
 
     datasets = {
         'train': {},
@@ -64,6 +70,9 @@ def data(
             'tgt': tgt_test_samples
         })
 
+    if not datasets['train']:
+        del datasets['train']
+
     if not datasets['dev']:
         del datasets['dev']
 
@@ -74,6 +83,15 @@ def data(
 
 
 def load(data_path):
+    '''
+    Loads the language data, training and development
+    datasets for training.
+
+    :param data_path:   path containing all data.
+    :returns:           language data, training and
+                        development dataset.
+    '''
+
     lang_path = f'{data_path}.lang.pt'
     train_path = f'{data_path}.train.pt'
     dev_path = f'{data_path}.dev.pt'
@@ -94,14 +112,18 @@ def load(data_path):
     except FileNotFoundError:
         # Dev set not available.
         print(
-            '[WARN]    no development dataset found,' +
-            'start training without dataset'
+            '[WARN]    no development dataset found,'
+            'start training without validation.'
         )
 
     return lang, datasets
 
 
 def __load_torch(path):
+    '''
+    Loads a pytorch .pt file created with torch.save.
+    '''
+
     if not os.path.exists(path):
 
         raise FileNotFoundError(f'File \'{path}\' not found.')
@@ -110,8 +132,11 @@ def __load_torch(path):
 
 
 def __load_file(path):
-    content = ''
+    '''
+    Reads a file as string.
+    '''
 
+    content = ''
     if not os.path.exists(path):
 
         raise FileNotFoundError(f'File \'{path}\' not found.')
