@@ -137,9 +137,22 @@ class NLP:
 
         self.vocab = None
 
+        # Initializes NONTERMINAL, TERMINAL, OPERATOR and
+        # TOKEN fields.
         self.__collect_symbols(lark, operators, self.lexer)
 
     def normalize(self, text, delimiters=False):
+        '''
+        Normalizes an input text, pads punctuation in
+        the text.
+
+        :param text:        the text to normalize.
+        :param delimiters:  whether to insert sequence delimiters
+                            '<SOS>' and '<EOS>'.
+        :returns:           list of all white-space separated
+                            tokens in the text.
+        '''
+
         text = self.__pad_punctuation(text)
         text = text.strip().lower()
         tokens = text.split()
@@ -152,6 +165,16 @@ class NLP:
         return tokens
 
     def tokenize(self, text, delimiters=False):
+        '''
+        Parses a target program and extracts the token
+        sequence from the parse tree.
+
+        :param text:        the input program string.
+        :param delimiters:  whether to use an '<SOS> indicator.
+        :returns:           token sequence corresponding to the
+                            input program as list.
+        '''
+
         parse = self.lark.parse(text)
         tokens = self.token_sequence(parse)
 
@@ -162,6 +185,17 @@ class NLP:
         return tokens
 
     def indices2tokens(self, indices):
+        '''
+        Converts a token sequence represented as integers into
+        it's original representation.
+
+        :param indices:     the indices of each token in the
+                            sequence according to the target
+                            vocabulary.
+        :returns:           sequence of programming language
+                            tokens.
+        '''
+
         tokens = [self.vocab['tgt'].i2w(i) for i in indices]
 
         try:
@@ -174,6 +208,15 @@ class NLP:
         return tokens
 
     def tokens2indices(self, tokens):
+        '''
+        Converts a token sequence into an integer representation
+        defined by the respective indices in the target vocabulary.
+
+        :param tokens:      the token sequence.
+        :returns:           integer representation of the token
+                            sequence.
+        '''
+
         indices = []
 
         for token in tokens:
@@ -186,6 +229,7 @@ class NLP:
 
             except KeyError:
 
+                # TODO: Useless?
                 unk_token = repr(self.mark.out['UNK'])
                 index = self.vocab['tgt'].w2i(unk_token)
                 indices.append(index)
@@ -193,6 +237,19 @@ class NLP:
         return indices
 
     def stack2indices(self, stack, delimiters=False):
+        '''
+        Converts a symbol sequence in a flattened parser stack into
+        an integer representation defined by the respective indices
+        in the stack vocabulary.
+
+        :param stack:       the symbols sequence corresponding
+                            to a value stack
+        :param delimiters:  whether to insert a '<SOS>' token at
+                            the beginning of the sequence.
+        :returns:           integer representation of the symbol
+                            sequence.
+        '''
+
         if delimiters:
             sos_token = repr(self.mark.out['SOS'])
             indices = [self.vocab['stack'].w2i(sos_token)]
@@ -201,12 +258,21 @@ class NLP:
 
         for symbol in stack:
             repr_ = repr(symbol)
-            # index = self.vocab['stack'].w2i(repr_)
             indices.append(self.vocab['stack'].w2i(repr_))
 
         return indices
 
     def stack_sequence(self, stack, filter_token=False):
+        '''
+        Flattens a parser value stack consisting of partial parse-
+        trees and tokens and optionally filters tokens out.
+
+        :param stack:           the original parser value stack.
+        :param filter_token:    whether to filter tokens on the stack.
+        :returns:               a flattened sequence of symbols as they
+                                appear on the value stack.
+        '''
+
         result = []
 
         for item in stack:
@@ -217,12 +283,24 @@ class NLP:
                 result.append(item)
 
             elif type(item) is Tree:
+                # Flatten the root tree node into a sequence
+                # of nonterminal symbols in the tree.
                 nt_seq = self.nonterminal_sequence(item)
                 result.extend(nt_seq)
 
         return result
 
     def nonterminal_sequence(self, tree):
+        '''
+        Flattens a tree on the parser value stack corresponding to
+        an non-terminal symbol. Converts the tree into a sequence
+        of non-terminal symbols depth-first, from left to right.
+
+        :param tree:    the tree node to linearize.
+        :returns:       a depth-first, left to right sequence
+                        of non-terminal tree nodes.
+        '''
+
         nt = self.NONTERMINALS[tree.data].nt
         result = [nt]
 
@@ -232,17 +310,27 @@ class NLP:
                 nt = self.nonterminal_sequence(tree.children[i])
                 result.extend(nt)
 
+            # TODO: Include tokens?
             # elif isinstance(tree.children[i], Token):
             #     result.append(tree.children[i])
 
         return result
 
     def token_sequence(self, tree):
+        '''
+        Extracts the  ordered token sequence from a parse
+        tree (the 'leaves' of the tree).
+
+        :param tree:    the input parse tree.
+        :returns:       ordered token sequence.
+        '''
+
         result = []
 
         for i in range(len(tree.children)):
 
             if isinstance(tree.children[i], Tree):
+                # Descend recursively.
                 tokens = self.token_sequence(tree.children[i])
                 result.extend(tokens)
 
@@ -252,6 +340,28 @@ class NLP:
         return result
 
     def alignment(self, source, target, sample_vocab):
+        '''
+        Any target token that has a pointer terminal type is
+        is assumed to appear in the input sequence and mapped
+        to the corresponding position in the input sequence.
+
+        For example, if a the string 'berlin' appears in the
+        target program and strings are defined in the grammar
+        to be pointer operators, we search for the word in the
+        input sequence this target sample belongs to. If it is
+        found we record the input position in an alignment vector.
+
+        The alignments are used during training to learn which input
+        position pointer operator tokens should copy the token values
+        from.
+
+        :param source:          source input string.
+        :param target:          target output program.
+        :param sample_vocab:    a small source sample vocab, taking
+                                tokens in the input sentence to integer
+                                indices.
+        '''
+
         # Map target tokens that are of operator type
         # to words in the input vocabulary.
         alignment = []
@@ -263,7 +373,6 @@ class NLP:
                 match = operator.source.findall(token.value)
                 word = match[0]
 
-                # TODO: Support multi word copying.
                 try:
                     tgt_in_src = sample_vocab['w2i'][word]
                     alignment.append(tgt_in_src)
@@ -277,8 +386,15 @@ class NLP:
         return alignment
 
     def match_tokens(self, regex, type_=None):
-        # Return token values in vocabulary that match a
-        # regular expression. Optionally, filter by type.
+        '''
+        Return token values in vocabulary that match a
+        regular expression. Optionally, filter by type.
+
+        :param regex:   the regex to be matched.
+        :param type_:   the token type to filter.
+        :returns:       matched token values.
+        '''
+
         find_type = (lambda t: t.type == type_)
         find_val = (lambda t: regex.match(t.value))
         find_tokens = (lambda t: find_type(t) and find_val(t))
@@ -296,6 +412,18 @@ class NLP:
         return list(result)
 
     def collect_tokens(self, vocab):
+        '''
+        Collects all tokens as they appear in the datasets
+        provided during preprocessing and as they are defined
+        in the grammar this nlp object is associated with.
+        Also associates terminal opjects with the tokens of the
+        respective terminal type.
+
+        :param vocab:   the vocabulary associated with this
+                        nlp object and environment.
+        :returns:       dictionary of tokens.
+        '''
+
         terminals = {}
 
         for terminal in self.TERMINALS.values():
@@ -322,10 +450,18 @@ class NLP:
                 if token_type in terminals and \
                    token_type not in self.OPERATOR:
                     token = Token(token_type, token_value)
+                    # Add token to the list terminal holds of
+                    # tokens that exist of this type.
                     terminals[token.type].tokens.append(token)
                     self.TOKENS[repr(token)] = token
 
     def __pad_punctuation(self, text):
+        '''
+        Pads punctuation in 'text'
+        A string "For example, this text." is converted
+        to "For example , this text ."
+        '''
+
         punct = string.punctuation
         mapping = {key: " {0} ".format(key) for key in punct}
         translator = str.maketrans(mapping)
@@ -333,6 +469,12 @@ class NLP:
         return padded
 
     def __collect_symbols(self, parser, operators, lexer):
+        '''
+        Builds the dicts for TOKEN, OPERATOR, TERMINAL and
+        NONTERMINAL attributes this class uses to perform it's
+        operations.
+        '''
+
         tokens = {}
         operator = {}
         terminals = {}
@@ -373,8 +515,21 @@ class NLP:
         self.TOKENS = tokens
 
     def __build_operators(self, operators):
+        '''
+        Links each operator terminal extracted from the grammar
+        to the operations they correspond to.
+
+        :param operators:   the operator data extracted from the
+                            grammar.
+        :returns:           instantiated operator functions to
+                            be applied on occurence of a particular
+                            operator in the output token stream.
+        '''
+
         result = {}
 
+        # The functions to be applied on occurence
+        # of the respective operator in the token stream.
         op_def = {
             '*': (lambda t, args: self.__STAR(t, args)),
             '@': (lambda t, args: self.__ANON(t, args)),
@@ -395,6 +550,22 @@ class NLP:
         return result
 
     def __STAR(self, t, args):
+        '''
+        The star ('*') operator corresponds to a pointer to the
+        input sequence. Whenever a token of pointer/star type is
+        predicted this function is applied to the token to copy
+        it's value from the input sequence.
+
+        :param operators:   the operator terminal object.
+        :param args:        list containing the input fields (0)
+                            created during preprocessing or inference
+                            and the copy probabilites, that indicate
+                            which element in the input sequence sould
+                            be copied for this output token.
+        :returns:           resolved output token where the token value
+                            corresponds to the token copied from the
+                            input sequence.
+        '''
 
         input_fields = args[0]
         copy_weights = args[1]
@@ -468,6 +639,9 @@ class NLP:
 
 
 class Symbol(abc.ABC):
+    '''
+    Base symbol class.
+    '''
 
     def __init__(self, name, type_):
         self.name = name
@@ -475,6 +649,16 @@ class Symbol(abc.ABC):
 
 
 class Terminal(Symbol):
+    '''
+    A terminal symbol.
+
+    :ivar tdef:     The lark terminal definition.
+    :ivar pattern:  The regex pattern for tokens that constitute
+                    terminals of this type.
+    :ivar tokens:   list of all tokens explicity appearing as
+                    alternative in the terminals regex or that appear
+                    in the datasets that this terminal instance belongs to.
+    '''
 
     def __init__(self, tdef):
         super(Terminal, self).__init__(tdef.name, tdef.name)
@@ -505,6 +689,22 @@ class Terminal(Symbol):
 
 
 class TerminalOp(Terminal):
+    '''
+    A terminal symbol with an function associated with it
+    that is applied to each token of this terminal type.
+
+    :ivar operator:     the operator data.
+    :ivar type:         the operator terminal type.
+    :ivar op_def:       the function to apply to tokens of
+                        this operator terminal type.
+    :ivar source:       the terminal regex in terms of the
+                        input source tokens. For example, a string
+                        includes double quotes in a program. when
+                        we want to copy a string from the input sequence
+                        we omit the double quotes when matching input
+                        tokens.
+    :ivar target:       the terminal target regex.
+    '''
 
     def __init__(self, tdef, operator):
         super(TerminalOp, self).__init__(tdef)
@@ -551,6 +751,13 @@ class TerminalOp(Terminal):
 
 
 class NonTerminal(Symbol):
+    '''
+    A nonterminal symbol.
+
+    :ivar nt:           larks non-terminal definiton.
+    :ivar expansions:   the expansion rules associated
+                        with this nonterminal.
+    '''
 
     def __init__(self, nt, expansions):
         super(NonTerminal, self).__init__(nt.name, nt.name)
@@ -560,6 +767,14 @@ class NonTerminal(Symbol):
 
 
 class Vocab:
+    '''
+    The primary vocabulary data structure used to convert
+    from tokens to indices and vice versa.
+
+    :param vocab:   dictionary containing i2w and w2i
+                    dictionaries corresponding to some
+                    mapping of indices to words/tokens.
+    '''
 
     def __init__(self, vocab):
         self._i2w = vocab['i2w']
@@ -575,6 +790,15 @@ class Vocab:
         return int(self._w2i[w])
 
     def extend(self, vocab, copy=False):
+        '''
+        Extends the vocabulary dynamically by additional tokens
+        found in 'vocab'. useful when copy attention is employed,
+        where the target vocabulary is extended by the input tokens.
+
+        :param vocab:   the vocab to extend this vocab by.
+        :returns:       the extended vocab.
+        '''
+
         if copy:
             extended_vocab = {
                 'i2w': self._i2w.copy(),
@@ -603,6 +827,14 @@ class Vocab:
         return Vocab(extended_vocab)
 
     def remove(self, vocab):
+        '''
+        Removes the elements in 'vocab' from this vocab. Useful
+        when using copy attention to remove the sample input tokens
+        a target vocabulary was extended by temporarily.
+
+        :param vocab:   the vocabulary elements to remove from this 
+                        vocabulary.
+        '''
 
         for key in vocab._w2i.keys():
             del self._w2i[key]
