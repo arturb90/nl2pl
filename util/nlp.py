@@ -1,3 +1,9 @@
+'''
+Main helper classes and functions for processing
+and preparing the grammar, inputs to and outputs
+from the neural network.
+'''
+
 import abc
 import re
 import string
@@ -8,12 +14,23 @@ from lark import Tree, Token
 
 
 def parse_grammar(grammar_content):
+    '''
+    Extracts operator terminals from a grammar file
+    and rewrites them such that the grammar file is
+    is a valid lark grammar.
+
+    :param grammar_content: the 'augmented' grammar file
+                            including operator terminals.
+    '''
+
     lines = grammar_content.split('\n')
     operators = []
     filtered = []
 
     for line in lines:
 
+        # Filter operator terminals such that they are
+        # 'normal' terminals again.
         if re.match(r'^(\*|~|@|\*@)[A-Z]*\s*:', line):
             l, operator = __parse_line(line)
             operators.append(operator)
@@ -27,6 +44,15 @@ def parse_grammar(grammar_content):
 
 
 def __parse_line(line):
+    '''
+    Helper for the function 'parse_grammar'.
+    Filters the line and removes operator
+    prefixes (if there are any)from lines
+    containing terminals.
+
+    :param line:    a line in a lark grammar file.
+    '''
+
     split = line.split(':')
     lhs = split[0].strip()
     rhs = split[1].strip()
@@ -54,8 +80,37 @@ def __parse_line(line):
 
 
 class NLP:
+    '''
+    The main helper class for processing and parsing
+    inputs to and outputs from the neural network.
+    It is initializied from a lark parser each time
+    a model trained or loaded for inference.
+
+    :param lark:        the lark parser generated from
+                        a grammar file.
+    :param operators:   all operator tokens in the model
+                        environment this instance belongs
+                        to.
+
+    :ivar NONTERMINALS:     collection of non-terminal
+                            symbols belonging to this parsing
+                            environment.
+    :ivar TERMINALS:        collection if terminal symbols.
+    :ivar OPERATOR:         collection of operator terminals.
+    :ivar TOKENS:           collection of all tokens apperaing
+                            in the target datasets passed during
+                            preprocessing.
+    '''
 
     class mark:
+        '''
+        Special symbols for both input and outputs.
+
+        <PAD>: Padding token.
+        <SOS>: Start of sequence.
+        <EOS>: End of sequence.
+        <UNK>: Unknown token.
+        '''
 
         inp = {
             'PAD': '<PAD>',
