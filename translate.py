@@ -109,10 +109,24 @@ def translate(model_env, src):
         except KeyError:
             src_i.append(unk_index)
 
+    src_i = torch.LongTensor(src_i).to(model.device)
+    input_fields = {
+        'src': src,
+        'src_i': src_i
+    }
+
+    if True:
+        # Create a mini sample vocab for copying.
+        sample_i2w = {i: t for i, t in enumerate(tokens)}
+        sample_w2i = {t: i for i, t in enumerate(tokens)}
+        sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
+
+    input_fields.update({'sample_vocab': sample_vocab})
+
     # Evaluate input.
     top, candidates = model.evaluate(
-        nlp, torch.LongTensor(src_i).to(model.device),
-        tokens, num_parsers=opts['beam_width'],
+        nlp, input_fields,
+        num_parsers=opts['beam_width'],
         beam_width=opts['beam_width']
     )
 

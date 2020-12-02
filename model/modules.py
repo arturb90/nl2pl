@@ -7,6 +7,10 @@ from torch.nn.utils.rnn import pad_packed_sequence
 
 
 class RNN(nn.Module):
+    '''
+    Base RNN module defining attributes common to both
+    decoder and encoder RNN's.
+    '''
 
     def __init__(self,
                  device,
@@ -36,6 +40,7 @@ class RNN(nn.Module):
         self.emb_dropout = nn.Dropout(emb_dropout)
         self.rnn_dropout = nn.Dropout(rnn_dropout)
 
+        # All RNN's are LSTM's by default.
         self.LSTM = nn.LSTM(
             input_size=inp_size,
             hidden_size=hid_size,
@@ -49,6 +54,23 @@ class RNN(nn.Module):
 
 
 class Encoder(RNN):
+    '''
+    The encoder module of the sequence-to-sequence model.
+
+    :param device:           the device on which pytorch allocates
+                             tensors. corresponds to your gpu if you
+                             have a CUDA enabled gpu, otherwise cpu.
+    :param layers:           the number of used by this encoder.
+    :param vocab_size:       the vocabulary size of the vocabulary
+                             associated with this encoder.
+    :param emb_size:         the size of the embedding layer.
+    :param hid_size:         the size of the hidden layer.
+    :param emb_dropout:      embedding dropout applied to the
+                             embedding layer between 0.0 and 1.0.
+    :param rnn_dropout:      dropout applied to the LSTM hidden
+                             and cell states.
+    :param bidirectional:    whether this RNN is bidirectional.
+    '''
 
     def __init__(self,
                  device,
@@ -74,12 +96,24 @@ class Encoder(RNN):
         )
 
     def forward(self, src_pad, src_lens):
+        '''
+        Computes the complete encoder forward-pass.
+
+        :param src_pad:         a padded source sample batch
+                                in integer representation.
+        :param src_lens:        original source sample lengths
+                                before batching.
+        '''
+
         embedded = self.embedding(src_pad)
 
         # inp           [ _inp_len : _batch_size ]
         # embedded      [ _inp_len : _batch_size : _emb_dim]
         emb_dropout = self.emb_dropout(embedded)
 
+        # Padded batches are packed in order to avoid
+        # computations on the padding symbols in
+        # the batch.
         src_packed = pack_padded_sequence(
             emb_dropout,
             src_lens,
@@ -88,6 +122,7 @@ class Encoder(RNN):
 
         out_packed, (enc_hid, enc_cell) = self.LSTM(src_packed)
 
+        # Unpack packed sequences to obtain the encoder output.
         enc_out = pad_packed_sequence(
             out_packed
         )
@@ -104,6 +139,30 @@ class Encoder(RNN):
 
 
 class Decoder(RNN):
+    '''
+    The decoder module of the sequence-to-sequence model.
+
+    :param device:          the device on which pytorch allocates
+                            tensors. corresponds to your gpu if you
+                            have a CUDA enabled gpu, otherwise cpu.
+    :param layers:          the number of used by this encoder.
+    :param vocab_size:      the vocabulary size of the vocabulary
+                            associated with this encoder.
+    :param emb_size:        the size of the embedding layer.
+    :param hid_size:        the size of the hidden layer.
+    :param emb_dropout:     embedding dropout applied to the
+                            embedding layer between 0.0 and 1.0.
+    :param rnn_dropout:     dropout applied to the LSTM hidden
+                            and cell states.
+
+    :ivar out:              the output layer of the decoder.
+    :ivar log_softmax:      applied to the decoder outputs
+                            to obtain the log likelihoods
+                            over the decoder vocabulary.
+    :ivar stack_encoder:    a stack encoder module to encode the
+                            current contents of the value stack at
+                            each decoding step.
+    '''
 
     def __init__(self,
                  device,
@@ -143,6 +202,25 @@ class Decoder(RNN):
                 u_align_copy=None,
                 value_stacks=None,
                 stack_lens=None):
+        '''
+        Computes one decoding step.
+
+        :param dec_inp:         the current input slice of the target
+                                sequence batch.
+        :param hid_prev:        the hidden state from the previous
+                                decoding step.
+        :param cell_prev:       the cell state from the previous
+                                decoding step.
+        :param enc_out:         the encoder outputs and hidden states.
+        :param attention:       an optional attention module.
+        :param copy_attention:  an optional copy attention module.
+        :param u_align:         precomputed weights for attention module.
+        :param u_align_copy:    precomputed weights for copy attention
+                                module.
+        :param value_stacks:    the padded value stacks for this decoding
+                                steps batched input slice.
+        :param stack_lens:      the original lengths for the value stacks.
+        '''
 
         dec_inp = dec_inp.unsqueeze(0)
         embedded = self.embedding(dec_inp)
@@ -165,6 +243,8 @@ class Decoder(RNN):
             dec_state.update({'attn_weights': attn_weights})
 
         if self.stack_encoder:
+            # Get the attention weights over
+            # the value stack contents.
             stack_attn, _ = self.stack_encoder(
                 hid_prev,
                 value_stacks,
@@ -183,8 +263,6 @@ class Decoder(RNN):
                 u_align_copy
             )
 
-            # context = torch.cat((attn_h, emb_dropout), dim=2)
-            # dec_state.update({'attn_weights': attn_weights})
             dec_state.update({'copy_weights': copy_weights})
 
         dec_out, (dec_hid, dec_cell) = self.LSTM(
@@ -206,6 +284,29 @@ class Decoder(RNN):
 
 
 class StackEncoder(RNN):
+    '''
+    The stack encoder encodes the parser's value stack
+    contents at each decoding step and generates a
+    weight distirbution over the contents of the value
+    stack. A linear combination of the stack encoders
+    hidden state is then fed into the decoder at each
+    decoding step.
+
+    :param device:          the device on which pytorch allocates
+                            tensors. corresponds to your gpu if you
+                            have a CUDA enabled gpu, otherwise cpu.
+    :param layers:          the number of used by this encoder.
+    :param vocab_size:      the vocabulary size of the vocabulary
+                            associated with this encoder.
+    :param emb_size:        the size of the embedding layer.
+    :param hid_size:        the size of the hidden layer.
+    :param emb_dropout:     embedding dropout applied to the
+                            embedding layer between 0.0 and 1.0.
+    :param rnn_dropout:     dropout applied to the LSTM hidden
+                            and cell states.
+    :align_in:              the input size of the attention module
+    :align_out:             the output size of the attention module.
+    '''
 
     def __init__(self,
                  device,
@@ -245,6 +346,16 @@ class StackEncoder(RNN):
         )
 
     def forward(self, query, src_pad, src_lens):
+        '''
+        The complete forward pass of the stack encoder including
+        the computation of the linear combination of stack encoder
+        hidden states.
+
+        :param query:
+        :param src_pad:
+        :param src_lens:
+        '''
+
         embedded = self.embedding(src_pad)
         emb_dropout = self.emb_dropout(embedded)
 

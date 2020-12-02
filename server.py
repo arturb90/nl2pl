@@ -14,7 +14,7 @@ from flask import Flask, request
 
 from translate import load_model_env, translate
 
-app = None
+app = Flask(__name__)
 model_dict = None
 
 
@@ -56,7 +56,7 @@ def serve():
     return response
 
 
-def evaluate(model_env, data):
+def evaluate(data):
     """
     Evaluate data received from client. Data must
     include a model id and an input source string.
@@ -67,7 +67,7 @@ def evaluate(model_env, data):
 
     src = data['src']
     model_id = data['id']
-    model_env = models[model_id]
+    model_env = model_dict[model_id]
 
     # Invoke the translate script.
     result = translate(model_env, src)
@@ -80,9 +80,6 @@ def run(
     port=4996,
     debug=False
 ):
-
-    global app
-    app = Flask(__name__)
 
     global model_dict
     model_dict = models
@@ -120,21 +117,6 @@ def load_models(config_path):
     return models
 
 
-def main2(
-    models,
-    host='localhost',
-    port=4996,
-    debug=False
-):
-
-    run(
-        host=args.host,
-        port=args.port,
-        models=models,
-        debug=False
-    )
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -153,7 +135,7 @@ if __name__ == '__main__':
 
     models = load_models(args.config)
 
-    main(
+    run(
         host=args.host,
         port=args.port,
         models=models,
