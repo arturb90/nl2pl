@@ -453,10 +453,9 @@ class Seq2Seq(nn.Module):
         with torch.no_grad():
             src_i = input_fields['src_i']
             src_i = torch.LongTensor(src_i)
-            src_i.to(self.device)
             src_len = [len(src_i)]
 
-            enc_inp = src_i.unsqueeze(1)
+            enc_inp = src_i.unsqueeze(1).to(self.device)
             enc_out, enc_state = self.encoder(enc_inp, src_len)
             enc_hid = enc_state['enc_hid']
             enc_cell = enc_state['enc_cell']

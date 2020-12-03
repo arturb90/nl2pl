@@ -572,21 +572,22 @@ class NLP:
 
         input_fields = args[0]
         copy_weights = args[1]
+        device = args[2]
 
         src_t = self.normalize(input_fields['src'], lower=False)
-        copy_weights = copy_weights[:, 1:-1]
+        copy_weights = copy_weights[:, 1:-1].to(device)
 
         shape = (1, copy_weights.shape[1])
         val_buffer = torch.empty(shape)
         idx_buffer = torch.empty(
             shape,
             dtype=torch.long
-        )
+        ).to(device)
 
         torch.topk(
             copy_weights, len(src_t),
             out=(val_buffer, idx_buffer)
-        )
+        ).to(device)
 
         tgt_vocab_len = len(self.vocab['tgt'])
         input_vocab = Vocab(input_fields['sample_vocab'])

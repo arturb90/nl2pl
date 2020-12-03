@@ -329,8 +329,6 @@ def main(args, logger):
 
     else:
 
-        model = {0: env}
-
         # TODO: Run server.
 
         logger['log'].log(

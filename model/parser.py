@@ -373,7 +373,8 @@ class StochasticLALR(LALRBase):
                     # the pointer operator.
                     index, token = self.nlp.OPERATOR[symbol.type].apply(
                         (memory_bank['input_fields'],
-                         memory_bank['copy_weights'])
+                         memory_bank['copy_weights'],
+                         self.decoder.device)
                     )
 
                 try:
