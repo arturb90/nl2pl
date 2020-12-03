@@ -582,17 +582,7 @@ if __name__ == '__main__':
     parser.add_argument('--check', action='store_true', default=False,
                         help='Check dataset and parse target samples.')
 
-    args = parser.parse_args([
-        '--grammar', 'data/grammars/geoquery-sql-anon.lark',
-        '--src_train',  'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_train.txt',
-        '--tgt_train',  'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_train.txt',
-        '--src_dev',    'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_dev.txt',
-        '--tgt_dev',    'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_dev.txt',
-        '--src_test',   'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-src_test.txt',
-        '--tgt_test',   'data/datasets/geoquery/geo_sql/question_split/vars_replaced/geo_sql-tgt_test.txt',
-        '--save_data', 'compiled/geoquery',
-        '--start', 'start'
-    ])
+    args = parser.parse_args()
 
     log = Logger()
     line = log.add_text('')

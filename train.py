@@ -557,31 +557,7 @@ if __name__ == '__main__':
                         help='Set encoder to compute forward and backward'
                         ' hidden states.')
 
-    # Args set for debugging purposes.
-    args = parser.parse_args([
-        '--data',               'compiled/geoquery',
-        '--save',               'compiled/geoquery-model',
-        '--out',                'compiled/log_train.txt',
-        '--epochs',             '1000',
-        '--early_stop',         '500',
-        '--layers',             '2',
-        '--enc_hidden_size',    '128',
-        '--dec_hidden_size',    '128',
-        '--enc_emb_size',       '92',
-        '--dec_emb_size',       '92',
-        '--batch_size',         '32',
-        '--teacher_forcing',    '0.8',
-        '--enc_rnn_dropout',    '0.2',
-        '--dec_rnn_dropout',    '0.2',
-        '--enc_emb_dropout',    '0.4',
-        '--dec_emb_dropout',    '0.4',
-        '--mask_ratio',         '0.15'
-        '--validate',
-        '--bidirectional',
-        '--copy',
-        '--attention',
-        '--best_gold'
-    ])
+    args = parser.parse_args()
 
     if validate_args(args):
 

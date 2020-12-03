@@ -835,7 +835,7 @@ class Vocab:
         when using copy attention to remove the sample input tokens
         a target vocabulary was extended by temporarily.
 
-        :param vocab:   the vocabulary elements to remove from this 
+        :param vocab:   the vocabulary elements to remove from this
                         vocabulary.
         '''
 

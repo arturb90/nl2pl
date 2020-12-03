@@ -366,17 +366,7 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=4996,
                         help='Port on which to serve.')
 
-    args = parser.parse_args([
-        '--model',          'compiled/geoquery-model.model_step_804.pt',
-        '--eval',           'compiled/geoquery.test.pt',
-        '--out',            'compiled/log_eval.txt',
-        '--beam_width',     '10'
-    ])
-
-    # args = parser.parse_args([
-    #     '--model',          'compiled/geoquery-model.model_step_180.pt',
-    #     '--beam_width',     '1'
-    # ])
+    args = parser.parse_args()
 
     log = Logger(out_path=args.out)
     line = log.add_text('')

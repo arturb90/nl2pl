@@ -2,14 +2,7 @@
 	"models": [
 		{
 			"id": 0,
-			"model": "compiled/geoquery-model.model_step_180.pt",
-			"opt": {
-				"beam_width": 1
-			}
-		},
-		{
-			"id": 1,
-			"model": "compiled/geoquery-model.model_step_180.pt",
+			"model": "your_model_path_here",
 			"opt": {
 				"beam_width": 1
 			}
