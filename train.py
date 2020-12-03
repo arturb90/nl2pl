@@ -321,11 +321,20 @@ def train(env, datasets):
     )
 
     train_data = datasets['train']
-    train_set = Dataset(train_data, model.device)
+    train_set = Dataset(
+        train_data,
+        model.device,
+        args.mask_ratio
+    )
 
     if 'dev' in datasets:
         dev_data = datasets['dev']
-        dev_set = Dataset(dev_data, model.device)
+        dev_set = Dataset(
+            dev_data,
+            model.device,
+            args.mask_ratio
+        )
+
         best_dev_acc = 0
         best_epoch = 0
 
@@ -484,6 +493,10 @@ if __name__ == '__main__':
     parser.add_argument('--gradient_clip', type=float, default=2,
                         help='Clipping to prevent exploding gradients.')
 
+    parser.add_argument('--mask_ratio', type=float, default=0.0,
+                        help='Ratio of input sample tokens to be masked'
+                        ' randomly as <UNK> tokens.')
+
     # Settings for model architecture.
     parser.add_argument('--attention', action='store_true', default=False,
                         help='Attention mechanism according to Bahdanau.')
@@ -562,8 +575,10 @@ if __name__ == '__main__':
         '--dec_rnn_dropout',    '0.2',
         '--enc_emb_dropout',    '0.4',
         '--dec_emb_dropout',    '0.4',
+        '--mask_ratio',         '0.15'
         '--validate',
         '--bidirectional',
+        '--copy',
         '--attention',
         '--best_gold'
     ])

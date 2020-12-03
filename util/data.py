@@ -1,5 +1,6 @@
 import torch
 
+from random import random
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
@@ -57,9 +58,10 @@ class Dataset(Dataset):
     Pytorch dataset object.
     '''
 
-    def __init__(self, dataset, device):
+    def __init__(self, dataset, device, mask_ratio=0):
         self.data = dataset
         self.device = device
+        self.mask_ratio = mask_ratio
 
     def __len__(self):
         return len(self.data)
@@ -71,5 +73,13 @@ class Dataset(Dataset):
         align = torch.LongTensor(sample['alignment']).to(self.device)
         stacks = torch.LongTensor(sample['value_stacks']).to(self.device)
         stack_lens = torch.LongTensor(sample['stack_lens'])
+
+        if self.mask_ratio:
+
+            for i in range(1, len(x)-1):
+
+                if random() <= self.mask_ratio:
+                    # 3 is <UNK> token.
+                    x[i] = 3
 
         return x, y, align, stacks, stack_lens
