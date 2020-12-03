@@ -291,7 +291,8 @@ def __resolve_pointers(nlp, example, predictions, copy_w):
     # Resolve operators.
     for i in pred_indices:
         pred_op = predictions[i]
-        op = op_vocab.i2w([pred_op.item()])
+        op = op_vocab.i2w(pred_op.item())
+        # TODO: Get operator.
         copy_index, _ = op.apply(
             (example, copy_w[i])
         )

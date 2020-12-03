@@ -3,7 +3,7 @@ import torch
 
 from collections import OrderedDict
 from datetime import datetime
-from lark import Lark, Token
+from lark import Lark, Token, UnexpectedToken
 
 import util.io as io
 
@@ -223,13 +223,19 @@ def __preprocess_datasets(nlp, vocab, datasets):
         for sample in samples:
 
             fields = __build_fields(nlp, sample, vocab)
-            result[dataset_name].append(fields)
-            count += 1
 
+            count += 1
             logger['line'].update(
                 f'[INFO {now}]    {count:<6}/{data_len:>6} '
                 f'preprocessing {dataset_name}'
             )
+
+            if fields is None:
+
+                # Fields were not parsable, skip sample.
+                continue
+
+            result[dataset_name].append(fields)
 
         # TODO: Hack, fix logger.
         if dataset_count == len(datasets):
@@ -404,7 +410,16 @@ def __output_vocab(nlp, datasets):
         for sample in tgt:
             # Parse each target sample and
             # update vocabulary dict with tokens.
-            tokens = nlp.tokenize(sample)
+
+            try:
+
+                tokens = nlp.tokenize(sample)
+
+            except UnexpectedToken:
+
+                # Skip sample if not parsable.
+                continue
+
             tokens = {
                 (repr(t) if t.type not in nlp.OPERATOR
                  else op_repr(nlp.OPERATOR[t.type])): None
@@ -492,7 +507,16 @@ def __build_fields(nlp, sample, vocab):
     tgt = sample[1]
 
     src_tokens = nlp.normalize(src, delimiters=True)
-    tgt_tokens = nlp.tokenize(tgt, delimiters=True)
+
+    try:
+
+        tgt_tokens = nlp.tokenize(tgt)
+
+    except UnexpectedToken:
+
+        # Abort if target sample is not parsable.
+        return None
+
     tgt_tokens = filter_unary(nlp, tgt_tokens)
 
     # Create a mini sample vocab for copying.

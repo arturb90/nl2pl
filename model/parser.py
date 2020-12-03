@@ -32,7 +32,7 @@ def filter_unary(nlp, tokens):
 
     next_ = parser.candidates
     tokeniter = iter(tokens[1:])
-    for i in range(len(parser.sequence)):
+    for i in range(len(parser.sequence)-1):
         next(tokeniter)
 
     for token in tokeniter:
