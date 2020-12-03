@@ -102,7 +102,7 @@ def load_models(config_path):
     """
 
     models = {}
-    with open(args.config) as file:
+    with open(config_path) as file:
         config = json.load(file)
 
     for model_conf in config['models']:

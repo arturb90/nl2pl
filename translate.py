@@ -117,8 +117,9 @@ def translate(model_env, src):
 
     if True:
         # Create a mini sample vocab for copying.
-        sample_i2w = {i: t for i, t in enumerate(tokens)}
-        sample_w2i = {t: i for i, t in enumerate(tokens)}
+        orig_tokens = nlp.normalize(src, lower=False)
+        sample_i2w = {i: t for i, t in enumerate(orig_tokens)}
+        sample_w2i = {t: i for i, t in enumerate(orig_tokens)}
         sample_vocab = {'i2w': sample_i2w, 'w2i': sample_w2i}
 
     input_fields.update({'sample_vocab': sample_vocab})

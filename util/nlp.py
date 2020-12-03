@@ -141,7 +141,7 @@ class NLP:
         # TOKEN fields.
         self.__collect_symbols(lark, operators, self.lexer)
 
-    def normalize(self, text, delimiters=False):
+    def normalize(self, text, delimiters=False, lower=True):
         '''
         Normalizes an input text, pads punctuation in
         the text.
@@ -154,7 +154,10 @@ class NLP:
         '''
 
         text = self.__pad_punctuation(text)
-        text = text.strip().lower()
+
+        if lower:
+            text = text.strip().lower()
+
         tokens = text.split()
 
         if delimiters:
@@ -570,7 +573,7 @@ class NLP:
         input_fields = args[0]
         copy_weights = args[1]
 
-        src_t = self.normalize(input_fields['src'])
+        src_t = self.normalize(input_fields['src'], lower=False)
         copy_weights = copy_weights[:, 1:-1]
 
         shape = (1, copy_weights.shape[1])
