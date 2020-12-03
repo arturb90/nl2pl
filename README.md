@@ -2,7 +2,7 @@
 
 [![Licence](https://img.shields.io/badge/license-MIT-orange)](https://gitlab.dlr.de/bara_at/nl2pl/-/blob/master/LICENSE)
 
-nl2pl is a tool for training neural semantic parsers that predict program code from natural language descriptions. It uses a grammar specification and a LALR(1) parser to enforce syntactically valid programs during inference. Check out the [live demo]() (TBD) to test some example models.
+nl2pl is a tool for training neural semantic parsers that predict program code from natural language descriptions. It uses a grammar specification and a LALR(1) parser to enforce syntactically valid programs during inference. Check out the [live demo](https://safe-plateau-06076.herokuapp.com/) (hosted on a Heroku free dyno, may take a few seconds to boot) to test some example models.
 
 
 ## Requirements
@@ -56,7 +56,7 @@ python3 preprocess.py \
 python3 train.py --data /path/to/data/data_name --save model_name --validate
 ```
 
-The training script defaults to a simple sequence-to-sequence model with an unidirectional one-layer encoder and decoder. By adding the `--attention` flag [Bahdanau attention](https://arxiv.org/abs/1409.0473) will be used for decoding. By adding the `--copy` flag a [pointer-generator network](https://arxiv.org/abs/1704.04368) (experimental) will be used for copying tokens from the input sentence. See `train.py` for a list of all possible configuration options. If the `--validate` flag is set, the script will validate training results on the development data and save the model with best performance on the development data.
+The training script defaults to a simple sequence-to-sequence model with an unidirectional one-layer encoder and decoder. By adding the `--attention` flag [Bahdanau attention](https://arxiv.org/abs/1409.0473) will be used for decoding. By adding the `--copy` flag a [pointer-generator network](https://arxiv.org/abs/1704.04368) will be used for copying tokens from the input sentence. See `train.py` for a list of all possible configuration options. If the `--validate` flag is set, the script will validate training results on the development data and save the model with best performance on the development data.
 
 The script will yield a model ready for inference:
 
