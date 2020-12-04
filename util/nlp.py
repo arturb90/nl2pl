@@ -587,7 +587,7 @@ class NLP:
         torch.topk(
             copy_weights, len(src_t),
             out=(val_buffer, idx_buffer)
-        ).to(device)
+        )
 
         tgt_vocab_len = len(self.vocab['tgt'])
         input_vocab = Vocab(input_fields['sample_vocab'])

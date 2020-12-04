@@ -1,6 +1,8 @@
 import os
 import torch
 
+from datetime import datetime
+
 
 def grammar(grammar_path):
 
@@ -112,8 +114,8 @@ def load(data_path):
     except FileNotFoundError:
         # Dev set not available.
         print(
-            '[WARN]    no development dataset found,'
-            'start training without validation.'
+            f'[WARN {datetime.now()}]    no development dataset'
+            ' found, start training without validation.'
         )
 
     return lang, datasets

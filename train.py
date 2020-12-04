@@ -434,6 +434,11 @@ def train(env, datasets):
             else:
                 early_stop = early_stop + 1
 
+        else:  # if not validating
+
+            # Save model each epoch if not validating.
+            __save_model(model, args, lang, epoch, epoch-1)
+
         # space
         print('')
 
@@ -449,10 +454,6 @@ def train(env, datasets):
     )
 
     logger['log'].close()
-
-    # Save model each epoch if not validating.
-    if 'dev' not in datasets or not args.validate:
-        __save_model(model, args, lang, epoch, epoch)
 
 
 if __name__ == '__main__':
