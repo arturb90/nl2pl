@@ -2,7 +2,7 @@
 
 [![Licence](https://img.shields.io/badge/license-MIT-orange)](https://gitlab.dlr.de/bara_at/nl2pl/-/blob/master/LICENSE)
 
-nl2pl is a tool for training neural semantic parsers that predict program code from natural language descriptions. It uses a grammar specification and a LALR(1) parser to enforce syntactically valid programs during inference. Check out the [live demo](https://safe-plateau-06076.herokuapp.com/) (hosted on a Heroku free dyno, may take a few seconds to boot) to test some example models.
+nl2pl is a tool for training neural semantic parsers that predict program code from natural language descriptions. It uses a grammar specification and a LALR(1) parser to enforce syntactically valid programs during inference. Check out the [live demo](https://safe-plateau-06076.herokuapp.com/) (hosted on a Heroku free dyno, may take few seconds to boot the app and return the page) to test some example models.
 
 
 ## Requirements
