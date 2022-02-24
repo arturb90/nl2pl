@@ -4,6 +4,10 @@
 
 nl2pl is a tool for training neural semantic parsers that predict program code from natural language descriptions. It uses a grammar specification and a LALR(1) parser to enforce syntactically valid programs during inference. Check out the [live demo](https://safe-plateau-06076.herokuapp.com/) (hosted on a Heroku free dyno, may take few seconds to boot the app and return the page) to test some example models.
 
+> __Grammar-Constrained Neural Semantic Parsing with LR Parsers__.  
+> Artur Baranowski and Nico Hochgeschwender    
+> In *Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021*, pages 1275–1279, Online.  
+> __[Project page](https://github.com/arturb90/nl2pl)&nbsp;/ [Paper](https://aclanthology.org/2021.findings-acl.108.pdf)&nbsp;__
 
 ## Requirements
 
@@ -91,6 +95,24 @@ curl -i -X POST -H "Content-Type: application/json"  \
 ```
 
 You can run multiple models by setting a configuration in `config.json` and running `server.py`. See `config.json` for an example.
+
+## Citation
+
+```
+@inproceedings{baranowski-hochgeschwender-2021-grammar,
+    title = "Grammar-Constrained Neural Semantic Parsing with {LR} Parsers",
+    author = "Baranowski, Artur  and
+      Hochgeschwender, Nico",
+    booktitle = "Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021",
+    month = aug,
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.findings-acl.108",
+    doi = "10.18653/v1/2021.findings-acl.108",
+    pages = "1275--1279",
+}
+```
 
 ## Acknowledgements
 
